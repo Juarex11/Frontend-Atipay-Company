@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@layer base {
+
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    /* Background colors - Clean white and soft grays */
+    --background: 0 0% 100%;
+    --foreground: 221 39% 11%;
+
+    /* Card colors - Elevated white cards */
+    --card: 0 0% 100%;
+    --card-foreground: 221 39% 11%;
+
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 39% 11%;
+
+    /* Primary - Deep navy blue for trust and professionalism */
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 98%;
+
+    /* Secondary - Premium gold accent */
+    --secondary: 45 93% 47%;
+    --secondary-foreground: 221 39% 11%;
+
+    /* Muted colors - Subtle grays */
+    --muted: 217 10% 96%;
+    --muted-foreground: 221 13% 46%;
+
+    /* Accent - Light gold for highlights */
+    --accent: 48 100% 96%;
+    --accent-foreground: 221 39% 11%;
+
+    /* Success - Financial green */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+
+    /* Warning - Attention orange */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+
+    /* Destructive - Professional red */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Border and input colors */
+    --border: 217 20% 90%;
+    --input: 217 20% 90%;
+    --ring: 221 83% 53%;
+
+    /* Border radius for modern look */
+    --radius: 0.75rem;
+
+    /* Sidebar colors - Professional navy */
+    --sidebar-background: 221 39% 11%;
+    --sidebar-foreground: 217 10% 96%;
+    --sidebar-primary: 45 93% 47%;
+    --sidebar-primary-foreground: 221 39% 11%;
+    --sidebar-accent: 221 25% 15%;
+    --sidebar-accent-foreground: 217 10% 96%;
+    --sidebar-border: 221 25% 15%;
+    --sidebar-ring: 45 93% 47%;
+  }
+
+  .dark {
+    /* Dark mode - Deep professional backgrounds */
+    --background: 221 39% 7%;
+    --foreground: 217 10% 96%;
+
+    /* Dark cards with subtle elevation */
+    --card: 221 25% 10%;
+    --card-foreground: 217 10% 96%;
+
+    /* Dark popover */
+    --popover: 221 25% 10%;
+    --popover-foreground: 217 10% 96%;
+
+    /* Primary - Bright blue for dark mode */
+    --primary: 221 83% 63%;
+    --primary-foreground: 221 39% 7%;
+
+    /* Secondary - Rich gold */
+    --secondary: 45 93% 57%;
+    --secondary-foreground: 221 39% 7%;
+
+    /* Muted dark colors */
+    --muted: 221 25% 13%;
+    --muted-foreground: 221 13% 66%;
+
+    /* Dark accent */
+    --accent: 221 25% 13%;
+    --accent-foreground: 217 10% 96%;
+
+    /* Success - Bright financial green */
+    --success: 142 71% 55%;
+    --success-foreground: 221 39% 7%;
+
+    /* Warning - Bright orange */
+    --warning: 38 92% 60%;
+    --warning-foreground: 221 39% 7%;
+
+    /* Destructive - Bright red */
+    --destructive: 0 72% 61%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Dark borders and inputs */
+    --border: 221 25% 15%;
+    --input: 221 25% 15%;
+    --ring: 221 83% 63%;
+
+    /* Dark sidebar */
+    --sidebar-background: 221 39% 4%;
+    --sidebar-foreground: 217 10% 96%;
+    --sidebar-primary: 45 93% 57%;
+    --sidebar-primary-foreground: 221 39% 4%;
+    --sidebar-accent: 221 25% 8%;
+    --sidebar-accent-foreground: 217 10% 96%;
+    --sidebar-border: 221 25% 8%;
+    --sidebar-ring: 45 93% 57%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
