@@ -67,22 +67,19 @@ const UserGiftCatalog = () => {
 
   const fetchRewardRequests = async () => {
     try {
-      const response = await fetch('https://api.atipaycompany.com/api/rewards/my-requests', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept': 'application/json',
-        },
-      });
+      const data = await giftService.getMyRequests();
 
-      if (!response.ok) {
-        throw new Error('Error al cargar el historial de recompensas');
-      }
+      const mappedData = data.map((req: any) => ({
+        ...req,
+        reward: {
+          ...req.reward,
+          image_url: req.reward.image_url || req.reward.reward_image || ''
+        }
+      }));
 
-      const data = await response.json();
-      setRewardRequests(Array.isArray(data) ? data : []);
+      setRewardRequests(mappedData);
     } catch (error) {
       console.error('Error fetching reward requests:', error);
-      toast.error('Error al cargar el historial de recompensas');
     }
   };
 
@@ -96,37 +93,45 @@ const UserGiftCatalog = () => {
     };
   };
 
-  const handleRedeemRequest = async (gift: Gift) => {
+const handleRedeemRequest = async (gift: Gift) => {
     if (isRedeeming) return;
+
+    // Validación rápida de puntos (opcional, ajusta según tu objeto user)
+    // @ts-ignore
+    if (user?.accumulated_points < gift.redeem_points) {
+        toast.error(`Necesitas ${gift.redeem_points} puntos para canjear esto.`);
+        return;
+    }
 
     setSelectedGift(gift);
     setIsRedeeming(true);
 
     try {
-      const response = await fetch(`https://api.atipaycompany.com/api/rewards/${gift.id}/request`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user?.id
+      // 1. Llamada a tu NUEVO servicio
+      const response = await giftService.redeemGift(gift.id);
+
+      // 2. Mensaje de éxito
+      toast.success(response.message || '¡Canje exitoso!');
+
+      // 3. ACTUALIZACIÓN VISUAL DEL STOCK (Sin recargar página)
+      // Recorremos los regalos y al que coincide con el ID, le actualizamos el stock
+      setGifts(currentGifts => 
+        currentGifts.map(g => {
+          if (g.id === gift.id) {
+            // Si el backend devuelve el stock exacto, úsalo. Si no, resta 1.
+            const newStock = response.data?.remaining_stock ?? (g.stock - 1);
+            return { ...g, stock: newStock };
+          }
+          return g;
         })
-      });
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al solicitar el canje');
-      }
-
-      toast.success(data.message || 'Solicitud de canje enviada exitosamente');
+      // 4. Actualizar historial de solicitudes
       await fetchRewardRequests();
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error redeeming gift:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al solicitar el canje');
+      toast.error(error.message || 'Error al solicitar el canje');
     } finally {
       setIsRedeeming(false);
       setSelectedGift(null);
@@ -209,6 +214,25 @@ const UserGiftCatalog = () => {
           >
             Mis Solicitudes
           </button>
+        </div>
+      </div>
+      {/* Banner de Saldo de Puntos */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-6 shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-green-100 p-2 rounded-full">
+            <Gift className="w-6 h-6 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm text-green-800 font-medium">Tu Saldo Disponible</p>
+            <p className="text-xs text-green-600">Úsalos para canjear estos premios</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-2xl font-bold text-green-700">
+            {/* Usamos 'as any' para evitar errores si el tipo User no está actualizado */}
+            {(user as any)?.accumulated_points || 0}
+          </span>
+          <span className="text-sm font-medium text-green-600 ml-1">pts</span>
         </div>
       </div>
 
