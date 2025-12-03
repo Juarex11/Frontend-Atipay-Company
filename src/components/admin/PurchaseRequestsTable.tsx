@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; 
-import { 
-  Check, 
-  X, 
-  Loader2, 
-  Eye, 
-  Filter, 
-  ChevronLeft, 
+import { Input } from '@/components/ui/input';
+import {
+  Check,
+  X,
+  Loader2,
+  Eye,
+  Filter,
+  ChevronLeft,
   ChevronRight,
   Search,
   ListFilter
@@ -16,7 +16,7 @@ import {
 import { AtipayCoin } from '@/components/ui/AtipayCoin';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductService } from '@/services/product.service';
-import ProofViewer from '@/components/ProofViewer'; 
+import ProofViewer from '@/components/ProofViewer';
 import { PurchaseDetailsModal } from './PurchaseDetailsModal';
 import {
   Table,
@@ -39,13 +39,14 @@ import {
 
 const fixUrl = (url: string | null | undefined) => {
   if (!url) return null;
-  if (url.includes('http://localhost/storage')) {
-    return url.replace('http://localhost/', 'http://127.0.0.1:8000/');
+  
+  // Si ya viene con http/https, revisamos si es localhost
+  if (url.startsWith('http')) {
+     return url.replace('http://localhost', 'http://127.0.0.1:8000');
   }
-  if (url.startsWith('/storage')) {
-    return `http://127.0.0.1:8000${url}`;
-  }
-  return url;
+  
+  // Si viene solo la ruta relativa (/storage/...), le pegamos tu dominio
+  return `http://127.0.0.1:8000/storage/${url.replace(/^\/storage\//, '')}`;
 };
 
 // Formatea fecha de forma segura (evita Invalid Date)
@@ -54,7 +55,7 @@ const formatDate = (dateString: string | null | undefined) => {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '-';
-    
+
     return date.toLocaleDateString('es-ES', {
       day: '2-digit',
       month: 'short',
@@ -92,7 +93,7 @@ interface ApiPurchaseRequest {
   updated_at: string;
   request_date: string;
   request_time: string;
-  deposit_proof_path?: string | null; 
+  deposit_proof_path?: string | null;
   deposit_status?: string; // Leemos el estado del depósito de la API
   user: {
     id: string | number;
@@ -160,15 +161,15 @@ export function PurchaseRequestsTable() {
   const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
-  
+
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 7; 
+  const itemsPerPage = 7;
 
   const { toast } = useToast();
 
@@ -186,13 +187,13 @@ export function PurchaseRequestsTable() {
     try {
       setIsLoading(true);
       const data = await ProductService.getPurchaseRequests();
-      
+
       const formattedData = (data as unknown as ApiPurchaseRequest[]).map(item => {
         const productId = item.product?.id ? Number(item.product.id) : 0;
         const productImage = item.product?.image_url || '';
-        
+
         // 1. Corrección de Fecha: Usamos created_at directo
-        const finalDate = item.created_at; 
+        const finalDate = item.created_at;
 
         // 2. Corrección de Estado Visual: 
         // Si la solicitud general ya no es "pending", el depósito asume ese estado
@@ -203,10 +204,10 @@ export function PurchaseRequestsTable() {
 
         return {
           ...item,
-          created_at: finalDate, 
+          created_at: finalDate,
           deposit_proof_path: item.deposit_proof_path || null,
           deposit_status: finalDepositStatus,
-          
+
           product: {
             id: productId,
             name: item.product?.name || 'Producto desconocido',
@@ -216,7 +217,7 @@ export function PurchaseRequestsTable() {
             image: productImage,
             type: item.product?.type || 'product',
             status: item.product?.status || 'active',
-            stock: 0, 
+            stock: 0,
             unit_type: 'unit',
             points_to_redeem: 0
           },
@@ -232,7 +233,7 @@ export function PurchaseRequestsTable() {
       formattedData.sort((a, b) => {
         if (a.status === 'pending' && b.status !== 'pending') return -1;
         if (a.status !== 'pending' && b.status === 'pending') return 1;
-        
+
         const dateA = new Date(a.created_at).getTime() || 0;
         const dateB = new Date(b.created_at).getTime() || 0;
         return dateB - dateA;
@@ -262,7 +263,7 @@ export function PurchaseRequestsTable() {
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
       const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = 
+      const matchesSearch =
         (req.user.name || '').toLowerCase().includes(searchLower) ||
         (req.user.email || '').toLowerCase().includes(searchLower) ||
         (req.product.name || '').toLowerCase().includes(searchLower);
@@ -307,16 +308,19 @@ export function PurchaseRequestsTable() {
   };
 
   const handleOpenViewer = (request: PurchaseRequest) => {
-    const imageUrl = fixUrl(request.deposit_proof_path);
-    setViewerData({
-      src: imageUrl,
-      id: request.id,
-      productName: request.product.name,
-      date: request.created_at,
-      status: request.deposit_status // Pasamos el estado corregido al visor
-    });
-    setIsViewerOpen(true);
-  };
+  // Usamos la función de arriba para obtener la URL correcta
+  const imageUrl = fixUrl(request.deposit_proof_path);
+  
+  setViewerData({
+    src: imageUrl,
+    id: request.id,
+    productName: request.product.name,
+    date: request.created_at, // Fecha de creación de la solicitud
+    status: request.deposit_status // Estado específico del depósito
+  });
+  
+  setIsViewerOpen(true); // Abre el modal de la foto
+};
 
   const getStatusBadgeStyles = (status: string) => {
     switch (status) {
@@ -346,10 +350,10 @@ export function PurchaseRequestsTable() {
 
   return (
     <div className="space-y-4">
-      
+
       {/* HEADER DE FILTROS */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-lg border shadow-sm">
-        
+
         {/* BUSCADOR */}
         <div className="relative w-full lg:w-1/3">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -360,9 +364,9 @@ export function PurchaseRequestsTable() {
             className="pl-9 w-full bg-gray-50 border-gray-200 focus:bg-white transition-colors"
           />
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
-          
+
           {/* FILTRO ESTADO */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[160px]">
@@ -418,7 +422,7 @@ export function PurchaseRequestsTable() {
                 <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
-                       <Search className="h-6 w-6 text-gray-400" />
+                      <Search className="h-6 w-6 text-gray-400" />
                     </div>
                     <p>No se encontraron resultados.</p>
                     {searchQuery && <p className="text-xs">Búsqueda: "{searchQuery}"</p>}
@@ -427,8 +431,8 @@ export function PurchaseRequestsTable() {
               </TableRow>
             ) : (
               paginatedRequests.map((request) => (
-                <TableRow 
-                  key={request.id} 
+                <TableRow
+                  key={request.id}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => { setSelectedRequest(request); setIsModalOpen(true); }}
                 >
@@ -442,45 +446,44 @@ export function PurchaseRequestsTable() {
                           className="h-10 w-10 object-cover rounded-md border bg-gray-50"
                         />
                       ) : (
-                         <div className="h-10 w-10 bg-gray-100 rounded-md border flex items-center justify-center text-xs text-gray-400">Sin img</div>
+                        <div className="h-10 w-10 bg-gray-100 rounded-md border flex items-center justify-center text-xs text-gray-400">Sin img</div>
                       )}
                       <span className="font-medium text-gray-900 line-clamp-2 text-sm">
                         {request.product?.name || 'Producto'}
                       </span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium text-gray-900 text-sm">{request.user.name}</span>
                       <span className="text-xs text-gray-500 truncate max-w-[140px]">{request.user.email}</span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell className="text-center font-medium">{request.quantity}</TableCell>
-                  
+
                   <TableCell className="text-center">
-                    <Badge variant="outline" className={`capitalize ${
-                      request.payment_method === 'deposit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                    <Badge variant="outline" className={`capitalize ${request.payment_method === 'deposit' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                       request.payment_method === 'atipay' ? 'bg-green-50 text-green-700 border-green-200' : ''
-                    }`}>
+                      }`}>
                       {request.payment_method || '---'}
                     </Badge>
                   </TableCell>
-                  
+
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1 font-semibold">
                       <AtipayCoin size="xs" className="w-3.5 h-3.5" />
                       <span>{(request.product?.price * request.quantity)?.toFixed(2)}</span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell className="text-center">
                     <Badge className={`${getStatusBadgeStyles(request.status)} border shadow-sm`}>
                       {getStatusText(request.status)}
                     </Badge>
                   </TableCell>
-                  
+
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center">
                       <span className="text-xs font-semibold text-gray-700 flex items-center gap-1 capitalize">
@@ -491,15 +494,28 @@ export function PurchaseRequestsTable() {
                       </span>
                     </div>
                   </TableCell>
-                  
+
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-center items-center gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        onClick={(e) => { e.stopPropagation(); handleOpenViewer(request); }}
-                        title="Ver Detalles"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evita que se abra la fila entera
+
+                          // LÓGICA INTELIGENTE:
+                          if (request.payment_method === 'deposit' && request.deposit_proof_path) {
+                            // Si es depósito y TIENE foto, abrimos el visor de imagen directamente
+                            handleOpenViewer(request);
+                          } else {
+                            // Si es otro método o no tiene foto aún, abrimos los detalles generales
+                            setSelectedRequest(request);
+                            setIsModalOpen(true);
+                          }
+                        }}
+                        // El título cambia dinámicamente para ayudar al admin
+                        title={request.deposit_proof_path ? "Ver Comprobante" : "Ver Detalles"}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -543,7 +559,7 @@ export function PurchaseRequestsTable() {
           <p className="text-sm text-gray-500">
             Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredRequests.length)} de {filteredRequests.length} resultados
           </p>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -569,12 +585,12 @@ export function PurchaseRequestsTable() {
       )}
 
       {/* MODALES */}
-      <PurchaseDetailsModal 
+      <PurchaseDetailsModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         request={selectedRequest}
       />
-      <ProofViewer 
+      <ProofViewer
         open={isViewerOpen}
         onClose={() => setIsViewerOpen(false)}
         data={viewerData}
