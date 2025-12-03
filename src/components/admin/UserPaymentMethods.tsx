@@ -134,7 +134,7 @@ export default function UserPaymentMethods() {
   const fetchPaymentMethods = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://api.atipaycompany.com/api/user/payment-methods', {
+      const response = await fetch('https://127.0.0.1:8000/api/user/payment-methods', {
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders()

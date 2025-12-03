@@ -83,7 +83,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
         { icon: Gift, label: "Regalos", href: "/admin/gifts" },
         { icon: Gift, label: "Promociones", href: "/promotions" },
-        { icon: CreditCard, label: "Métodos de Pago", href: "/admin/payment-methods" }
+        { icon: CreditCard, label: "Métodos de Pago", href: "/admin/payment-methods" } 
       ]
       : [
         { icon: BarChart3, label: "Mi Dashboard", href: "/dashboard" },
@@ -105,6 +105,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
   const adminItems = [
     { icon: Users, label: "Red de Afiliados", href: "/admin/affiliates" },
     { icon: Package, label: "Tienda Admin", href: "/admin/store" },
+    { icon: BarChart3, label: "Reporte de Comisiones", href: "/admin/reports/commissions" },
     { icon: TrendingUp, label: "Configurar Comisiones", href: "/admin/commissions" },
     { icon: Settings, label: "Perfil de Admin", href: "/admin/profile" }
   ];

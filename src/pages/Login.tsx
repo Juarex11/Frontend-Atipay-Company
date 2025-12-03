@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Shield, Users, Zap } from "lucide-react";
+import React, {useRef} from "react";
+import ReCAPTCHA from "react-google-recaptcha";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,8 +22,29 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  const [captchaValid, setCaptchaValid] = useState(false);
+  const [captchaError, setCaptchaError] = useState("");
+
+
+  const captcha = useRef<ReCAPTCHA>(null);
+
+  const onChange = () => {
+  if (captcha.current) {
+    const value = captcha.current.getValue();
+    if (value) {
+      setCaptchaValid(true);
+      setCaptchaError("");
+    }
+  }
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!captchaValid) {
+    setCaptchaError("Debes aceptar el captcha antes de iniciar sesión.");
+    return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -46,13 +69,10 @@ export default function Login() {
       if (err instanceof Error) {
         if (err.message.includes("Failed to fetch")) {
           errorMessage =
-            "No se pudo conectar con el servidor. Verifica tu conexión a Internet. Asegúrate que el backend esté corriendo en http://127.0.0.1:8000";
-        } else if (err.message.includes("User o contraseña incorrectos") || err.message.includes("Credenciales inválidas")) {
+            "No se pudo conectar con el servidor. Verifica tu conexión a Internet.";
+        } else if (err.message.includes("401")) {
           errorMessage =
-            "Usuario/email o contraseña incorrectos. Verifica que el usuario exista y la contraseña sea correcta.";
-        } else if (err.message.includes("inactiva")) {
-          errorMessage =
-            "Tu cuenta está inactiva. Contacta a un administrador.";
+            "Usuario o contraseña incorrectos. Por favor, verifica tus credenciales.";
         } else if (err.message) {
           errorMessage = err.message;
         }
@@ -215,6 +235,21 @@ export default function Login() {
                         <Eye className="h-5 w-5 text-muted-foreground" />
                       )}
                     </button>
+                  </div>
+                </div>
+
+                  <div className="w-full flex justify-center mt-4">
+                  <div className="flex flex-col items-center">
+                    <ReCAPTCHA
+                      ref={captcha}
+                      sitekey="6LceRRksAAAAACFuzi3HbNTyIJ8mmJAChFV6FRJG"
+                      onChange={onChange}
+                    />
+                    {captchaError && (
+                      <p className="text-red-600 text-sm mt-2 text-center">
+                        {captchaError}
+                      </p>
+                    )}
                   </div>
                 </div>
 

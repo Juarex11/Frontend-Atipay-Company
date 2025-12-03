@@ -198,7 +198,7 @@ export function NotificationsDropdown() {
 
   const fetchRecharges = async (headers: HeadersInit): Promise<Recharge[]> => {
     try {
-      const rechargesRes = await fetch('https://api.atipaycompany.com/api/atipay-recharges', { headers });
+      const rechargesRes = await fetch('https://127.0.0.1:8000/api/atipay-recharges', { headers });
       if (rechargesRes.ok) {
         const rechargesData = await rechargesRes.json();
         return Array.isArray(rechargesData) ? rechargesData : rechargesData?.data || [];
@@ -212,7 +212,7 @@ export function NotificationsDropdown() {
 
   const fetchUsers = async (headers: HeadersInit): Promise<User[]> => {
     try {
-      const usersRes = await fetch('https://api.atipaycompany.com/api/users', { headers });
+      const usersRes = await fetch('https://127.0.0.1:8000/api/users', { headers });
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         return Array.isArray(usersData) ? usersData : usersData?.data || [];
@@ -236,7 +236,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const response = await fetch('https://api.atipaycompany.com/api/withdrawals', {
+      const response = await fetch('https://127.0.0.1:8000/api/withdrawals', {
         headers,
         method: 'GET'
       });
@@ -263,7 +263,7 @@ export function NotificationsDropdown() {
 
   const fetchPurchaseRequests = async (headers: HeadersInit): Promise<PurchaseRequest[]> => {
     try {
-      const response = await fetch('https://api.atipaycompany.com/api/products/purchase-requests', {
+      const response = await fetch('https://127.0.0.1:8000/api/products/purchase-requests', {
         headers,
         method: 'GET'
       });
@@ -299,7 +299,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const investmentsRes = await fetch('https://api.atipaycompany.com/api/investments/pending', {
+      const investmentsRes = await fetch('https://127.0.0.1:8000/api/investments/pending', {
         headers,
         method: 'GET'
       });

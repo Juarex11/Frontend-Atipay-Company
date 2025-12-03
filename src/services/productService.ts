@@ -21,8 +21,9 @@ export interface PurchaseRequest {
   id: string;
   product_id: string;
   user_id: string;
-  status: 'pending' | 'approved' | 'rejected';
-  payment_method: 'atipay' | 'points' | 'mixed';
+  status: 'pending' | 'approved' | 'rejected' | 'canceled' | 'expired';
+  // payment_method can now include 'deposit' from backend
+  payment_method: 'atipay' | 'points' | 'mixed' | 'deposit';
   amount: number;
   points_used: number;
   created_at: string;
@@ -33,6 +34,12 @@ export interface PurchaseRequest {
     email: string;
   };
   admin_message?: string;
+  // Deposit-specific optional fields (may not exist for all purchases)
+  deposit_proof_path?: string | null;
+  deposit_status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  deposit_validated_by?: number | null;
+  deposit_validated_at?: string | null;
+  deposit_admin_comment?: string | null;
 }
 
 const getAuthHeadersWithContentType = (contentType: string = 'application/json'): Record<string, string> => {
@@ -244,7 +251,7 @@ export const productService = {
 
   async purchaseProduct(
     productId: string,
-    paymentMethod: 'atipay' | 'points' | 'mixed',
+    paymentMethod: 'atipay' | 'points' | 'mixed' | 'deposit',
     quantity: number = 1
   ): Promise<{ message: string }> {
     const response = await fetch(API_ROUTES.PRODUCTS.PURCHASE, {

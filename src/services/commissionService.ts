@@ -46,6 +46,60 @@ export interface WithdrawResponse {
   amount?: string;
 }
 
+// === NUEVAS INTERFACES PARA EL REPORTE (ADMIN DASHBOARD) ===
+
+export interface DashboardTotals {
+  total_general: string;
+  total_pagadas: string;
+  total_pendientes: string;
+}
+
+export interface MonthlyCommissionStat {
+  year: number | null;
+  month: number | null;
+  total: string;
+  pagadas: string;
+  pendientes: string;
+}
+
+export interface CommissionUserBasic {
+  id: number;
+  username: string;
+  email: string;
+  referral_url?: string;
+}
+
+export interface UserCommissionStat {
+  user_id: number;
+  total: string;
+  pagadas: string;
+  pendientes: string;
+  user: CommissionUserBasic;
+}
+
+export interface CommissionDetailItem {
+  id: number;
+  user_id: number;
+  referred_user_id: number;
+  level: number;
+  commission_amount: string;
+  points_generated: number;
+  source_type: string;
+  month: number;
+  year: number;
+  withdrawn: number; // 0 o 1
+  locked: number;
+  user: CommissionUserBasic;
+  referred_user: CommissionUserBasic;
+}
+
+export interface CommissionReportResponse {
+  totales_generales: DashboardTotals;
+  por_mes: MonthlyCommissionStat[];
+  por_usuario: UserCommissionStat[];
+  detalle: CommissionDetailItem[];
+}
+
 const handleResponse = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -145,4 +199,19 @@ export const withdrawCommissions = async (): Promise<WithdrawResponse> => {
   });
   
   return handleResponse<WithdrawResponse>(response);
+};
+
+//  NUEVA FUNCIÓN PARA OBTENER EL REPORTE GENERAL DE COMISIONES
+export const getDashboardReport = async (): Promise<CommissionReportResponse> => {
+  const token = localStorage.getItem('token');
+  
+  // Nota: Usamos la ruta exacta que validamos en Postman
+  const response = await fetch(`${API_BASE_URL}/commissions/report`, {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  return handleResponse<CommissionReportResponse>(response);
 };

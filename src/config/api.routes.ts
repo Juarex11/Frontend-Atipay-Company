@@ -35,6 +35,9 @@ export const API_ROUTES = {
   COMMISSIONS: {
     SETTINGS: `${API_BASE_URL}/commissions/settings`,
     SETTINGS_BY_LEVEL: (level: number) => `${API_BASE_URL}/commissions/settings/${level}`,
+
+    // AGRUEGUE LA RUTA PARA EL REPORTE GENERAL DE COMISIONES
+    REPORT: `${API_BASE_URL}/commissions/report`,
   },
 
   // Investments
@@ -63,16 +66,24 @@ export const API_ROUTES = {
     REJECT: (id: string | number) => `${API_BASE_URL}/investment-withdrawals/${id}/reject`,
   },
 
-  // Products
-  PRODUCTS: {
-    BASE: `${API_BASE_URL}/products`,
-    BY_ID: (id: string | number) => `${API_BASE_URL}/products/${id}`,
-    MY_PURCHASE_REQUESTS: `${API_BASE_URL}/products/my-purchase-requests`,
-    PURCHASE: `${API_BASE_URL}/products/purchase`,
-    PURCHASE_REQUESTS: `${API_BASE_URL}/products/purchase-requests`,
-    APPROVE_PURCHASE: (id: string | number) => `${API_BASE_URL}/products/purchase-requests/${id}/approve`,
-    REJECT_PURCHASE: (id: string | number) => `${API_BASE_URL}/products/purchase-requests/${id}/reject`,
-  },
+PRODUCTS: {
+  BASE: `${API_BASE_URL}/products`,
+  BY_ID: (id: string | number) => `${API_BASE_URL}/products/${id}`,
+  MY_PURCHASE_REQUESTS: `${API_BASE_URL}/products/my-purchase-requests`,
+  PURCHASE: `${API_BASE_URL}/products/purchase`,
+
+  // Subir comprobante de depósito 🆕
+  UPLOAD_PROOF: (id: string | number) =>
+    `${API_BASE_URL}/products/purchase-requests/${id}/upload-proof`,
+
+  // Admin – obtener solicitudes
+  PURCHASE_REQUESTS: `${API_BASE_URL}/products/purchase-requests`,
+  APPROVE_PURCHASE: (id: string | number) =>
+    `${API_BASE_URL}/products/purchase-requests/${id}/approve`,
+  REJECT_PURCHASE: (id: string | number) =>
+    `${API_BASE_URL}/products/purchase-requests/${id}/reject`,
+},
+
 
   // Promotions
   PROMOTIONS: {
@@ -82,20 +93,20 @@ export const API_ROUTES = {
     UPDATE: (id: string | number) => `${API_BASE_URL}/promotions/${id}`,
     DELETE: (id: string | number) => `${API_BASE_URL}/promotions/${id}`,
   },
-// Referrals
+
+  // Referrals
 
 REFERRALS: {
   NETWORK: `${API_BASE_URL}/referrals/my-network`,
   NETWORK_COUNT: `${API_BASE_URL}/referrals/my-network-count`,
   EARNINGS: `${API_BASE_URL}/referrals/earnings`,
 
-  ADMIN_REFERRALS: {
-    NETWORK_FOR_USER: (userId: number | string) =>
-      `${API_BASE_URL}/admin/referrals/network/${userId}`,
-    SEARCH_USERS: `${API_BASE_URL}/admin/search-users`,
-  },
+  // 🆕 Nuevo endpoint para ver la red de cualquier usuario
+  NETWORK_FOR_USER: (userId: number | string) =>
+    `${API_BASE_URL}/admin/referrals/network/${userId}`,
+},
 
-  },
+
 
   // Withdrawals
   WITHDRAWALS: {

@@ -18,6 +18,7 @@ const getDiasTranscurridos = (fechaInicio: string): number => {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 };
 
+
 const ActiveInvestmentsPage: React.FC = () => {
   const [data, setData] = useState<InvestmentSummary[]>([]);
   const [filteredData, setFilteredData] = useState<InvestmentSummary[]>([]);
@@ -54,7 +55,6 @@ const ActiveInvestmentsPage: React.FC = () => {
       )
     );
   };
-
   console.log("DATA DEL BACKEND:", filteredData);
 
   return (
@@ -97,8 +97,6 @@ const ActiveInvestmentsPage: React.FC = () => {
                 <th className="px-4 py-3">Estado</th>
               </tr>
             </thead>
-
-            {/* IMPLEMENTACIÓN COMPLETA EXACTA */}
             <tbody className="divide-y divide-gray-200">
               {filteredData.map((item) => (
                 <tr
@@ -107,9 +105,7 @@ const ActiveInvestmentsPage: React.FC = () => {
                 >
                   <td className="px-4 py-3 font-medium">
                     {item.usuario_nombre}
-                    <div className="text-xs text-gray-500">
-                      {item.usuario_email}
-                    </div>
+                    <div className="text-xs text-gray-500">{item.usuario_email}</div>
                   </td>
 
                   <td className="px-4 py-3">{item.promocion_nombre}</td>
@@ -125,19 +121,18 @@ const ActiveInvestmentsPage: React.FC = () => {
                   <td className="px-4 py-3 text-orange-700">
                     ${item.retorno_total_generado}
                   </td>
-
                   <td className="px-4 py-3">
                     {item.fecha_inicio}
                     <div className="text-xs text-gray-500">
                       {item.dias_transcurridos} días transcurridos
                     </div>
                   </td>
-
                   <td className="px-4 py-3">
                     <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
                       {item.estado.toUpperCase()}
                     </span>
                   </td>
+
                 </tr>
               ))}
             </tbody>

@@ -13,6 +13,11 @@ export interface Product {
   status?: string;
   type: string;
   image?: File | string | null;
+  // Some backend responses include `image_url` (full URL string).
+  // Add it as optional so frontend components can safely read it.
+  image_url?: string | null;
+  duration?: string | null;
+  tutor?: string | null;
 }
 
 interface PurchaseRequest {

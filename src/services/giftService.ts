@@ -160,38 +160,4 @@ export const giftService = {
 
     return await response.json().catch(() => ({}));
   },
-  /**
-   * Canjear regalo (Nuevo endpoint)
-   */
-  async redeemGift(id: number) {
-    // Usamos el endpoint que probamos en Postman
-    const response = await fetch(`${API_BASE_URL}/rewards/${id}/redeem`, {
-      method: 'POST',
-      headers: getAuthHeaders()
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Error al procesar el canje');
-    }
-
-    return data;
-  },
-  /**
-   * Obtener mi historial de solicitudes
-   */
-  async getMyRequests() {
-    const response = await fetch(`${API_BASE_URL}/rewards/my-requests`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-
-    if (!response.ok) {
-      throw new Error('Error al cargar historial');
-    }
-
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
-  },
 };

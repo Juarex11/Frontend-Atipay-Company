@@ -1,10 +1,87 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input'; 
+import { 
+  Check, 
+  X, 
+  Loader2, 
+  Eye, 
+  Filter, 
+  ChevronLeft, 
+  ChevronRight,
+  Search,
+  ListFilter
+} from 'lucide-react';
 import { AtipayCoin } from '@/components/ui/AtipayCoin';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductService } from '@/services/product.service';
+import ProofViewer from '@/components/ProofViewer'; 
+import { PurchaseDetailsModal } from './PurchaseDetailsModal';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// --- UTILIDADES ---
+
+const fixUrl = (url: string | null | undefined) => {
+  if (!url) return null;
+  if (url.includes('http://localhost/storage')) {
+    return url.replace('http://localhost/', 'http://127.0.0.1:8000/');
+  }
+  if (url.startsWith('/storage')) {
+    return `http://127.0.0.1:8000${url}`;
+  }
+  return url;
+};
+
+// Formatea fecha de forma segura (evita Invalid Date)
+const formatDate = (dateString: string | null | undefined) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '-';
+    
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch (e) {
+    return '-';
+  }
+};
+
+const formatTime = (dateString: string | null | undefined) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+
+    return date.toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch (e) {
+    return '';
+  }
+};
+
+// --- INTERFACES ---
 
 interface ApiPurchaseRequest {
   id: string | number;
@@ -15,6 +92,8 @@ interface ApiPurchaseRequest {
   updated_at: string;
   request_date: string;
   request_time: string;
+  deposit_proof_path?: string | null; 
+  deposit_status?: string; // Leemos el estado del depósito de la API
   user: {
     id: string | number;
     name: string;
@@ -37,17 +116,6 @@ interface ApiPurchaseRequest {
   user_id?: string | number;
 }
 
-import { PurchaseDetailsModal } from './PurchaseDetailsModal';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
 export interface PurchaseRequest {
   id: string | number;
   product_id: string | number;
@@ -57,6 +125,8 @@ export interface PurchaseRequest {
   updated_at: string;
   request_date?: string;
   request_time?: string;
+  deposit_proof_path?: string | null;
+  deposit_status?: string;
   user: {
     id: string | number;
     name: string;
@@ -77,11 +147,12 @@ export interface PurchaseRequest {
     unit_type: string;
     points_to_redeem: number;
   };
-  // Optional fields that might come from the API
   user_id?: string | number;
   payment_method: string;
   admin_message?: string | null;
 }
+
+// --- COMPONENTE PRINCIPAL ---
 
 export function PurchaseRequestsTable() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
@@ -89,24 +160,53 @@ export function PurchaseRequestsTable() {
   const [processingId, setProcessingId] = useState<string | number | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7; 
+
   const { toast } = useToast();
+
+  // Visor de Imagen
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [viewerData, setViewerData] = useState<{
+    src: string | null;
+    id?: string | number;
+    productName?: string;
+    date?: string;
+    status?: string;
+  } | null>(null);
 
   const fetchRequests = useCallback(async () => {
     try {
       setIsLoading(true);
-      console.log('Obteniendo solicitudes de compra...');
       const data = await ProductService.getPurchaseRequests();
-      console.log('Datos de solicitudes recibidos:', data);
-
-      // Map the data to match our PurchaseRequest interface
+      
       const formattedData = (data as unknown as ApiPurchaseRequest[]).map(item => {
         const productId = item.product?.id ? Number(item.product.id) : 0;
         const productImage = item.product?.image_url || '';
         
+        // 1. Corrección de Fecha: Usamos created_at directo
+        const finalDate = item.created_at; 
+
+        // 2. Corrección de Estado Visual: 
+        // Si la solicitud general ya no es "pending", el depósito asume ese estado
+        // aunque la BD diga "pending".
+        let finalDepositStatus = item.deposit_status || 'pending';
+        if (item.status === 'rejected') finalDepositStatus = 'rejected';
+        if (item.status === 'approved') finalDepositStatus = 'approved';
+
         return {
           ...item,
-          created_at: item.request_date ? `${item.request_date} ${item.request_time}` : item.created_at,
-          // Ensure product has all required fields with defaults
+          created_at: finalDate, 
+          deposit_proof_path: item.deposit_proof_path || null,
+          deposit_status: finalDepositStatus,
+          
           product: {
             id: productId,
             name: item.product?.name || 'Producto desconocido',
@@ -116,11 +216,10 @@ export function PurchaseRequestsTable() {
             image: productImage,
             type: item.product?.type || 'product',
             status: item.product?.status || 'active',
-            stock: 0, // Default values for required fields
+            stock: 0, 
             unit_type: 'unit',
             points_to_redeem: 0
           },
-          // Ensure user has all required fields
           user: {
             id: item.user?.id || item.user_id || 0,
             name: item.user?.name || item.user?.username || 'Usuario',
@@ -129,12 +228,22 @@ export function PurchaseRequestsTable() {
         } as PurchaseRequest;
       });
 
+      // Ordenar: Pendientes primero, luego fecha descendente
+      formattedData.sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        
+        const dateA = new Date(a.created_at).getTime() || 0;
+        const dateB = new Date(b.created_at).getTime() || 0;
+        return dateB - dateA;
+      });
+
       setRequests(formattedData);
     } catch (error) {
       console.error('Error fetching purchase requests:', error);
       toast({
         title: 'Error',
-        description: 'No se pudieron cargar las solicitudes de compra',
+        description: 'No se pudieron cargar las solicitudes',
         variant: 'destructive',
       });
     } finally {
@@ -146,22 +255,39 @@ export function PurchaseRequestsTable() {
     fetchRequests();
   }, [fetchRequests]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, paymentFilter]);
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter(req => {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = 
+        (req.user.name || '').toLowerCase().includes(searchLower) ||
+        (req.user.email || '').toLowerCase().includes(searchLower) ||
+        (req.product.name || '').toLowerCase().includes(searchLower);
+
+      const matchesPayment = paymentFilter === 'all' || req.payment_method === paymentFilter;
+      const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
+
+      return matchesSearch && matchesPayment && matchesStatus;
+    });
+  }, [requests, searchQuery, paymentFilter, statusFilter]);
+
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const paginatedRequests = filteredRequests.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const handleApprove = async (id: string | number) => {
     try {
       setProcessingId(id);
       await ProductService.approvePurchaseRequest(id);
       await fetchRequests();
-      toast({
-        title: 'Solicitud aprobada',
-        description: 'La solicitud ha sido aprobada exitosamente',
-      });
+      toast({ title: 'Aprobado', description: 'Solicitud aprobada correctamente.', className: "bg-green-50 border-green-200 text-green-800" });
     } catch (error) {
-      console.error('Error approving request:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo aprobar la solicitud',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'No se pudo aprobar.', variant: 'destructive' });
     } finally {
       setProcessingId(null);
     }
@@ -170,222 +296,291 @@ export function PurchaseRequestsTable() {
   const handleReject = async (id: string | number) => {
     try {
       setProcessingId(id);
-      await ProductService.rejectPurchaseRequest(id, { admin_message: 'Solicitud rechazada por el administrador' });
+      await ProductService.rejectPurchaseRequest(id, { admin_message: 'Rechazado por admin' });
       await fetchRequests();
-      toast({
-        title: 'Solicitud rechazada',
-        description: 'La solicitud ha sido rechazada exitosamente',
-      });
+      toast({ title: 'Rechazado', description: 'Solicitud rechazada.', variant: 'destructive' });
     } catch (error) {
-      console.error('Error rejecting request:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo rechazar la solicitud',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'No se pudo rechazar.', variant: 'destructive' });
     } finally {
       setProcessingId(null);
     }
   };
 
-  const getStatusVariant = (status: string) => {
+  const handleOpenViewer = (request: PurchaseRequest) => {
+    const imageUrl = fixUrl(request.deposit_proof_path);
+    setViewerData({
+      src: imageUrl,
+      id: request.id,
+      productName: request.product.name,
+      date: request.created_at,
+      status: request.deposit_status // Pasamos el estado corregido al visor
+    });
+    setIsViewerOpen(true);
+  };
+
+  const getStatusBadgeStyles = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'default';
+        return 'bg-green-100 text-green-700 border-green-200 hover:bg-green-100';
       case 'rejected':
-        return 'destructive';
+        return 'bg-red-100 text-red-700 border-red-200 hover:bg-red-100';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-100';
       default:
-        return 'secondary';
+        return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Pendiente';
-      case 'approved':
-        return 'Aprobado';
-      case 'rejected':
-        return 'Rechazado';
-      default:
-        return status;
+      case 'pending': return 'Pendiente';
+      case 'approved': return 'Aprobado';
+      case 'rejected': return 'Rechazado';
+      default: return status;
     }
-  };
-
-  const getPaymentMethodBadgeClass = (paymentMethod: string) => {
-    switch (paymentMethod) {
-      case 'atipay':
-        return 'border-green-200 bg-green-50 text-green-700';
-      case 'points':
-        return 'border-blue-200 bg-blue-50 text-blue-700';
-      default:
-        return 'bg-gray-50';
-    }
-  };
-
-  const getPaymentMethodText = (paymentMethod: string | undefined) => {
-    return paymentMethod || 'Desconocido'; // Return 'Desconocido' if paymentMethod is undefined
   };
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex justify-center h-64 items-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableCaption className="text-lg font-semibold">Lista de solicitudes de compra con Atipay</TableCaption>
-        <TableHeader>
-          <TableRow className="bg-gray-50">
-            <TableHead className="w-[25%] min-w-[200px]">Producto</TableHead>
-            <TableHead className="w-[15%] min-w-[120px]">Usuario</TableHead>
-            <TableHead className="w-[8%] text-center">Cantidad</TableHead>
-            <TableHead className="w-[12%] text-center">Método de Pago</TableHead>
-            <TableHead className="w-[10%] text-right">Total</TableHead>
-            <TableHead className="w-[10%] text-center">Estado</TableHead>
-            <TableHead className="w-[12%] text-center">Fecha</TableHead>
-            <TableHead className="w-[8%] text-center">Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requests.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                No hay solicitudes de compra pendientes
-              </TableCell>
+    <div className="space-y-4">
+      
+      {/* HEADER DE FILTROS */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-lg border shadow-sm">
+        
+        {/* BUSCADOR */}
+        <div className="relative w-full lg:w-1/3">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+          <Input
+            placeholder="Buscar usuario, email o producto..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-full bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+          />
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
+          
+          {/* FILTRO ESTADO */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <div className="flex items-center gap-2">
+                <ListFilter className="w-4 h-4 text-gray-500" />
+                <SelectValue placeholder="Estado" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="pending">🟡 Pendientes</SelectItem>
+              <SelectItem value="approved">🟢 Aprobados</SelectItem>
+              <SelectItem value="rejected">🔴 Rechazados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* FILTRO MÉTODO */}
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <SelectValue placeholder="Método" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los métodos</SelectItem>
+              <SelectItem value="deposit">Depósito</SelectItem>
+              <SelectItem value="atipay">Atipay</SelectItem>
+            </SelectContent>
+          </Select>
+
+        </div>
+      </div>
+
+      {/* TABLA DE CONTENIDO */}
+      <div className="rounded-md border bg-white shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50/50">
+              <TableHead className="w-[25%]">Producto</TableHead>
+              <TableHead className="w-[15%]">Usuario</TableHead>
+              <TableHead className="text-center">Cant.</TableHead>
+              <TableHead className="text-center">Método</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-center">Estado</TableHead>
+              <TableHead className="text-center">Fecha</TableHead>
+              <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
-          ) : (
-            requests.map((request) => (
-              <TableRow 
-                key={request.id} 
-                className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => {
-                  setSelectedRequest(request);
-                  setIsModalOpen(true);
-                }}
-              >
-                <TableCell className="py-3">
-                  <div className="flex items-center space-x-3">
-                    {request.product?.image && typeof request.product.image === 'string' && (
-                      <img
-                        src={request.product.image}
-                        alt={request.product.name}
-                        className="h-10 w-10 object-cover rounded-md border"
-                      />
-                    )}
-                    <span className="font-medium text-gray-900 line-clamp-2">
-                      {request.product?.name || 'Producto'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <span className="font-medium text-gray-900">
-                    {request.user.name || request.user.email.split('@')[0]}
-                  </span>
-                </TableCell>
-                <TableCell className="text-center py-3">
-                  <span className="font-medium">{request.quantity}</span>
-                </TableCell>
-                <TableCell className="text-center py-3">
-                  <Badge
-                    variant="outline"
-                    className={getPaymentMethodBadgeClass(request.payment_method || '')}
-                  >
-                    {getPaymentMethodText(request.payment_method)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <AtipayCoin size="xs" className="w-3.5 h-3.5" />
-                    <span className="font-medium text-gray-900">
-                      {(request.product?.price * request.quantity)?.toFixed(2) || '0.00'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-center py-3">
-                  <div className="flex justify-center">
-                    <Badge
-                      variant={getStatusVariant(request.status)}
-                      className="min-w-[80px] justify-center"
-                    >
-                      {getStatusText(request.status)}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="text-center py-3">
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm font-medium text-gray-900">
-                      {request.request_date || new Date(request.created_at).toLocaleDateString()}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {request.request_time || new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-center space-x-1">
-                    {request.status === 'pending' ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-green-200 hover:text-green-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApprove(request.id);
-                          }}
-                          disabled={processingId === request.id}
-                          title="Aprobar"
-                        >
-                          {processingId === request.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-red-200 hover:text-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleReject(request.id);
-                          }}
-                          disabled={processingId === request.id}
-                          title="Rechazar"
-                        >
-                          {processingId === request.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-sm text-gray-500">
-                        {request.status === 'approved' ? 'Aprobado' : 'Rechazado'}
-                      </span>
-                    )}
+          </TableHeader>
+          <TableBody>
+            {paginatedRequests.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center">
+                       <Search className="h-6 w-6 text-gray-400" />
+                    </div>
+                    <p>No se encontraron resultados.</p>
+                    {searchQuery && <p className="text-xs">Búsqueda: "{searchQuery}"</p>}
                   </div>
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      
-      {/* Purchase Details Modal */}
+            ) : (
+              paginatedRequests.map((request) => (
+                <TableRow 
+                  key={request.id} 
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => { setSelectedRequest(request); setIsModalOpen(true); }}
+                >
+                  {/* CELDAS */}
+                  <TableCell className="py-3">
+                    <div className="flex items-center space-x-3">
+                      {request.product?.image ? (
+                        <img
+                          src={request.product.image}
+                          alt={request.product.name}
+                          className="h-10 w-10 object-cover rounded-md border bg-gray-50"
+                        />
+                      ) : (
+                         <div className="h-10 w-10 bg-gray-100 rounded-md border flex items-center justify-center text-xs text-gray-400">Sin img</div>
+                      )}
+                      <span className="font-medium text-gray-900 line-clamp-2 text-sm">
+                        {request.product?.name || 'Producto'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-gray-900 text-sm">{request.user.name}</span>
+                      <span className="text-xs text-gray-500 truncate max-w-[140px]">{request.user.email}</span>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell className="text-center font-medium">{request.quantity}</TableCell>
+                  
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className={`capitalize ${
+                      request.payment_method === 'deposit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                      request.payment_method === 'atipay' ? 'bg-green-50 text-green-700 border-green-200' : ''
+                    }`}>
+                      {request.payment_method || '---'}
+                    </Badge>
+                  </TableCell>
+                  
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1 font-semibold">
+                      <AtipayCoin size="xs" className="w-3.5 h-3.5" />
+                      <span>{(request.product?.price * request.quantity)?.toFixed(2)}</span>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <Badge className={`${getStatusBadgeStyles(request.status)} border shadow-sm`}>
+                      {getStatusText(request.status)}
+                    </Badge>
+                  </TableCell>
+                  
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center">
+                      <span className="text-xs font-semibold text-gray-700 flex items-center gap-1 capitalize">
+                        {formatDate(request.created_at)}
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        {formatTime(request.created_at)}
+                      </span>
+                    </div>
+                  </TableCell>
+                  
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-center items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={(e) => { e.stopPropagation(); handleOpenViewer(request); }}
+                        title="Ver Detalles"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+
+                      {request.status === 'pending' && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700"
+                            onClick={(e) => { e.stopPropagation(); handleApprove(request.id); }}
+                            disabled={processingId === request.id}
+                            title="Aprobar"
+                          >
+                            {processingId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={(e) => { e.stopPropagation(); handleReject(request.id); }}
+                            disabled={processingId === request.id}
+                            title="Rechazar"
+                          >
+                            {processingId === request.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* PAGINACIÓN */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+          <p className="text-sm text-gray-500">
+            Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, filteredRequests.length)} de {filteredRequests.length} resultados
+          </p>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+            </Button>
+            <div className="text-sm font-medium">
+              Página {currentPage} de {totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* MODALES */}
       <PurchaseDetailsModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         request={selectedRequest}
       />
+      <ProofViewer 
+        open={isViewerOpen}
+        onClose={() => setIsViewerOpen(false)}
+        data={viewerData}
+      />
     </div>
   );
-};
+}
 
 export default PurchaseRequestsTable;

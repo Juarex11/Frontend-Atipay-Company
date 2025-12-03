@@ -11,9 +11,6 @@ import { getTransferHistory } from "@/services/walletService";
 import { getActiveInvestments, type Investment as ServiceInvestment } from "@/services/investmentService";
 import { getUserProfile, type UserProfile } from "@/services/userService";
 import { API_BASE_URL } from "@/config";
-import QualificationStatusCard from '../../components/dashboard/QualificationStatusCard';
-import PointsHistoryChart from '../../components/dashboard/PointsHistoryChart';
-
 
 interface Transfer {
   id: number;
@@ -238,15 +235,6 @@ export default function Dashboard() {
             Actualizar
           </Button>
         </div>
-        
-
-        {/*  COMPONENTE DE ESTADO DE CALIFICACIÓN  */}
-         <QualificationStatusCard /> 
-
-         <div className="w-full mb-6">
-    <PointsHistoryChart />
-</div>
-
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
             <div className="flex items-center">

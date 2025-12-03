@@ -268,17 +268,10 @@ export const getInvestmentDailyGains = async (investmentId: number): Promise<Dai
 };
 
 const getAuthHeaders = (): { [key: string]: string } => {
-  const token =
-    localStorage.getItem('token') ||
-    localStorage.getItem('auth_token') ||
-    localStorage.getItem('api_token') ||
-    localStorage.getItem('access_token');
-
+  const token = localStorage.getItem('token');
   if (!token) {
-    console.warn("⚠ No se encontró token en localStorage");
     throw new Error('No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.');
   }
-
   return {
     'Authorization': `Bearer ${token}`,
     'Accept': 'application/json',

@@ -4,8 +4,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, CheckCircle2, Clock, XCircle, Check, X, Loader } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -19,7 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.atipaycompany.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://127.0.0.1:8000';
 
 // Table components
 const Table = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (

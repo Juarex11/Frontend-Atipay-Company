@@ -10,8 +10,6 @@ import { getRecharges, type Recharge } from "@/services/atipayRechargeService";
 import { RechargeList } from "@/pages/admin/Dashboard/components/recharges/RechargeList";
 import { PendingInvestments } from "@/pages/admin/Dashboard/components/investments/PendingInvestments";
 
-
-
 export default function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("investments");
@@ -77,11 +75,10 @@ export default function AdminDashboard() {
       loadRecharges();
     }
   }, [activeTab, loadRecharges]);
-  
+
   return (
     <div className="p-3 sm:p-4 md:p-6 w-full overflow-x-hidden">
       <div className="flex flex-col space-y-4 sm:space-y-6">
-        
         <Tabs
           value={activeTab}
           onValueChange={handleTabChange}

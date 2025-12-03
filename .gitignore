@@ -7,25 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependencias
 node_modules
-.pnp
-.pnp.js
-
-# Testing
-coverage
-
-# Producción (Build)
 dist
 dist-ssr
 *.local
-
-# Entorno y Seguridad (MUY IMPORTANTE)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Editor directories and files
 .vscode/*
@@ -33,7 +18,7 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
-*.ntvs
+*.ntvs*
 *.njsproj
 *.sln
 *.sw?

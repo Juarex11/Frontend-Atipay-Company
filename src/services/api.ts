@@ -15,18 +15,17 @@ interface RegisterData {
 }
 
 export const loginUser = async (usernameOrEmail: string, password: string): Promise<AuthResponse> => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-  console.log('Iniciando solicitud de login a:', apiUrl + '/login');
+  console.log('Iniciando solicitud de login a: http://127.0.0.1:8000/api/login');
 
   try {
-    const response = await fetch(apiUrl + '/login', {
+    const response = await fetch('http://127.0.0.1:8000/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: JSON.stringify({
-        username: usernameOrEmail,
+        username: usernameOrEmail, // Always send as username field
         password: password,
       })
     });
@@ -34,9 +33,7 @@ export const loginUser = async (usernameOrEmail: string, password: string): Prom
     const responseData = await response.json();
 
     if (!response.ok) {
-      // El backend devuelve el error en 'error' o 'message'
-      const errorMsg = responseData.error || responseData.message || 'Error en la autenticación';
-      throw new Error(errorMsg);
+      throw new Error(responseData.message || 'Error en la autenticación');
     }
 
     console.log('Datos de la respuesta:', responseData);
@@ -48,8 +45,7 @@ export const loginUser = async (usernameOrEmail: string, password: string): Prom
 };
 
 export const registerUser = async (data: RegisterData): Promise<AuthResponse> => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-  const response = await fetch(apiUrl + '/register', {
+  const response = await fetch(API_ROUTES.AUTH.REGISTER, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -71,53 +67,3 @@ export const registerUser = async (data: RegisterData): Promise<AuthResponse> =>
 
   return response.json() as Promise<AuthResponse>;
 };
-
-// Obtener URL base desde variable de entorno o usar default para desarrollo
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-
-// Helper para obtener headers con el token actual
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : '',
-  };
-};
-
-// Objeto 'api' que simula ser Axios pero usa fetch (para no romper tu estándar)
-const api = {
-  get: async (endpoint: string) => {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
-    });
-    if (!response.ok) {
-      const error: any = new Error(`Error GET ${endpoint}`);
-      error.status = response.status;
-      error.statusCode = response.status;
-      throw error;
-    }
-    const data = await response.json();
-    return { data, status: response.status };
-  },
-
-  post: async (endpoint: string, body: any) => {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      const error: any = new Error(`Error POST ${endpoint}`);
-      error.status = response.status;
-      error.statusCode = response.status;
-      throw error;
-    }
-    const data = await response.json();
-    return { data, status: response.status };
-  }
-};
-
-// Exportamos 'api' por defecto para que se vaya el error rojo en los componentes
-export default api;

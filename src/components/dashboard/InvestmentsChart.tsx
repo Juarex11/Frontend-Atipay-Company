@@ -44,7 +44,7 @@ export function InvestmentsChart() {
           throw new Error('No se encontró el token de autenticación');
         }
 
-        const response = await fetch('https://api.atipaycompany.com/api/investments', {
+        const response = await fetch('https://127.0.0.1:8000/api/investments', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',

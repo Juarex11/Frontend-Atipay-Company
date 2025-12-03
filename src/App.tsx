@@ -28,6 +28,7 @@ import UserWithdrawals from "./pages/usuario/UserWithdrawals";
 import WithdrawalsAdmin from "./pages/WithdrawalsAdmin";
 import UsersManagement from "./pages/admin/UsersManagement";
 import Commissions from "./pages/Commissions";
+import CommissionsReportsPage from "./pages/admin/CommissionsReportsPage";
 import AffiliateNetwork from "./pages/admin/AffiliateNetwork";
 import AdminProfileSettings from "./pages/admin/AdminProfileSettings";
 import AdminPaymentMethods from "./pages/admin/AdminPaymentMethods";
@@ -315,6 +316,16 @@ function AppRoutes() {
           </AdminRoute>
         }
       />
+      <Route
+      path="/admin/reports/commissions"
+      element={
+        <AdminRoute>
+        <AppLayout>
+          <CommissionsReportsPage />
+          </AppLayout>
+        </AdminRoute>
+      }
+/>
       <Route
         path="/admin/profile"
         element={

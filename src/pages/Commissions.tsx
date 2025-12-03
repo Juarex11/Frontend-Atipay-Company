@@ -51,7 +51,6 @@ interface ApiWithdrawalResponse {
 import { getUserProfile } from '@/services/userService';
 import { toast } from '@/components/ui/use-toast';
 import { AtipayCoin } from '@/components/ui/AtipayCoin';
-import QualificationStatusCard from '@/components/dashboard/QualificationStatusCard';
 
 const Commissions: React.FC = () => {
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
@@ -84,7 +83,7 @@ const Commissions: React.FC = () => {
         throw new Error('No se encontró el token de autenticación');
       }
 
-      const response = await fetch('https://api.atipaycompany.com/api/commissions/withdrawals/history', {
+      const response = await fetch('https://127.0.0.1:8000/api/commissions/withdrawals/history', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -305,11 +304,6 @@ const Commissions: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* 👇 COMPONENTE DE ESTADO DE CALIFICACIÓN 👇 */}
-      {/* Así el usuario verá su meta antes de intentar retirar */}
-      <QualificationStatusCard />
-      {/* 👆 FIN DEL COMPONENTE DE CALIFICACIÓN 👆 */}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
