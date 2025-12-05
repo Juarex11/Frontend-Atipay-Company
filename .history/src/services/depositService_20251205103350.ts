@@ -261,7 +261,7 @@ export const DepositService = {
   /**
    * Cancelar una solicitud de depósito
    */
-  async cancelDepositRequest(_depositId: number): Promise<{
+  async cancelDepositRequest(depositId: number): Promise<{
     success: boolean;
     message: string;
     error?: string;
