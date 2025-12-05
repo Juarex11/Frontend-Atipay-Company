@@ -67,7 +67,7 @@ const UserGiftCatalog = () => {
 
   const fetchRewardRequests = async () => {
     try {
-      const response = await fetch('https://127.0.0.1:8000/api/rewards/my-requests', {
+      const response = await fetch('http://127.0.0.1:8000/api/rewards/my-requests', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Accept': 'application/json',
@@ -103,7 +103,7 @@ const UserGiftCatalog = () => {
     setIsRedeeming(true);
 
     try {
-      const response = await fetch(`https://127.0.0.1:8000/api/rewards/${gift.id}/request`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/rewards/${gift.id}/request`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
