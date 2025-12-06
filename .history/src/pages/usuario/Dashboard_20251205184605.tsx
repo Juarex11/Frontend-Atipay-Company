@@ -28,8 +28,6 @@ interface DashboardData {
   totalEarnings: number;
   activeInvestments: number;
   points: number;
-  
-  points_history?: Array<{ name: string; puntos: number }>;
   recentTransactions: Array<{
     id: number;
     type: string;
@@ -144,7 +142,6 @@ export default function Dashboard() {
         activeInvestments: investments.length,
         totalEarnings,
         points: userData.accumulated_points || 0,
-        points_history: userData.points_history || [],
         recentTransactions: transactions,
         investments: investments.map(inv => ({
           id: inv.id,
@@ -387,18 +384,15 @@ export default function Dashboard() {
               <div className="lg:col-span-5">
                   <QualificationStatus 
                       puntosActuales={dashboardData.points} 
-                      
                       puntosMeta={93} 
                   />
               </div>
 
               {/* Columna Derecha: Gráfica Anual */}
-              <div className="lg:col-span-7"><AnnualPerformanceChart 
-       // Pasamos los datos del backend. Si no existen aún, pasamos un array vacío []
-        data={dashboardData.points_history || []} 
-       totalAnual={dashboardData.points} // O la suma del historial si prefieres
-       
-    /></div>
+              <div className="lg:col-span-7">
+                  <AnnualPerformanceChart />
+              </div>
+
           </div>
       </div>
 

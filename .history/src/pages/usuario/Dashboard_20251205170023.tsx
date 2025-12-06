@@ -1,18 +1,21 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router";
 import AppLayout from "@/components/layouts/AppLayout";
+import { PointsHistoryChart } from "@/components/dashboard/PointsHistoryChart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, EyeOff, RefreshCw, AlertCircle } from "lucide-react";
+import InvestmentGainsCharts from "@/components/investments/InvestmentGainsCharts";
 import { AtipayCoin } from "@/components/ui/AtipayCoin";
 import { getTransferHistory } from "@/services/walletService";
 import { getActiveInvestments, type Investment as ServiceInvestment } from "@/services/investmentService";
 import { getUserProfile, type UserProfile } from "@/services/userService";
 import { API_BASE_URL } from "@/config";
-import QualificationStatus from "@/components/dashboard/QualificationStatus";
-import AnnualPerformanceChart from "@/components/dashboard/AnnualPerformanceChart";
-import InvestmentGainsCharts from "@/components/investments/InvestmentGainsCharts";
+
+
+
 interface Transfer {
   id: number;
   amount: number;
@@ -28,8 +31,6 @@ interface DashboardData {
   totalEarnings: number;
   activeInvestments: number;
   points: number;
-  
-  points_history?: Array<{ name: string; puntos: number }>;
   recentTransactions: Array<{
     id: number;
     type: string;
@@ -144,7 +145,6 @@ export default function Dashboard() {
         activeInvestments: investments.length,
         totalEarnings,
         points: userData.accumulated_points || 0,
-        points_history: userData.points_history || [],
         recentTransactions: transactions,
         investments: investments.map(inv => ({
           id: inv.id,
@@ -378,94 +378,33 @@ export default function Dashboard() {
 
           </div>
         )}
-        <div className="mt-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Tu progreso en la red</h2>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
-              {/* Columna Izquierda: Estado de Calificación */}
-              <div className="lg:col-span-5">
-                  <QualificationStatus 
-                      puntosActuales={dashboardData.points} 
-                      
-                      puntosMeta={93} 
-                  />
-              </div>
 
-              {/* Columna Derecha: Gráfica Anual */}
-              <div className="lg:col-span-7"><AnnualPerformanceChart 
-       // Pasamos los datos del backend. Si no existen aún, pasamos un array vacío []
-        data={dashboardData.points_history || []} 
-       totalAnual={dashboardData.points} // O la suma del historial si prefieres
-       
-    /></div>
-          </div>
-      </div>
-
-        {/* LÓGICA FINAL: Si invierte -> Gráficos. Si no -> Calificación */}
-        {/* ================================================================================== */}
-        {/* SECCIÓN INFERIOR: CÓMO CRECEN TUS INVERSIONES (Lógica recuperada)                  */}
-        {/* ================================================================================== */}
-        
-        <div className="mt-8">
-          {/* TÍTULO DE LA SECCIÓN */}
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Cómo crecen tus inversiones</h2>
-            <p className="text-sm text-gray-500">
-              Visualiza tus ganancias diarias y el progreso mensual de una inversión específica.
-            </p>
-          </div>
-
-          {dashboardData.investments.length > 0 ? (
-            // OPCIÓN A: SI TIENE INVERSIONES -> MUESTRA EL GRÁFICO REAL
-            <Card>
-              <CardContent className="pt-6">
+        {/* Gráficos de ganancias de inversión */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cómo crecen tus inversiones</CardTitle>
+              <CardDescription>
+                Visualiza tus ganancias diarias y el progreso mensual de una inversión específica. Estos gráficos usan datos reales del sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Usamos la primera inversión activa si existe; si no, mostramos un ejemplo (ID 1). */}
+              {dashboardData.investments.length > 0 ? (
                 <InvestmentGainsCharts investmentId={dashboardData.investments[0].id} />
-              </CardContent>
-            </Card>
-          ) : (
-            // OPCIÓN B: NO TIENE INVERSIONES -> MUESTRA EL DISEÑO DE "ESTADO VACÍO" (FOTO 2)
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Tarjeta 1: Ganancias Diarias Vacía */}
-              <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center h-64 justify-center">
-                <div className="w-full text-left mb-auto">
-                   <h3 className="text-lg font-bold text-orange-500">Ganancias diarias</h3>
-                   <p className="text-xs text-orange-300">No hay inversiones registradas</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="mb-4 bg-orange-50 p-3 rounded-full">
-                     <AtipayCoin size="lg" className="w-10 h-10" />
-                  </div>
-                  <h4 className="text-gray-600 font-medium text-sm mb-1">Aún no tienes inversiones activas.</h4>
-                  <p className="text-xs text-gray-400 max-w-[250px]">
-                    Comienza invirtiendo en alguno de nuestros planes para ver tus ganancias aquí.
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Aún no tienes inversiones activas. A continuación verás un ejemplo de cómo se visualizan las ganancias.
                   </p>
-                </div>
-              </div>
-
-              {/* Tarjeta 2: Ganancias Mensuales Vacía */}
-              <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center h-64 justify-center">
-                <div className="w-full text-left mb-auto">
-                   <h3 className="text-lg font-bold text-orange-500">Ganancias mensuales</h3>
-                   <p className="text-xs text-orange-300">No hay inversiones registradas</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="mb-4 bg-orange-50 p-3 rounded-full">
-                     <AtipayCoin size="lg" className="w-10 h-10" />
-                  </div>
-                  <h4 className="text-gray-600 font-medium text-sm mb-1">Las ganancias mensuales aparecerán aquí.</h4>
-                  <p className="text-xs text-gray-400 max-w-[250px]">
-                    Realiza tu primera inversión para comenzar a generar ganancias.
-                  </p>
-                </div>
-              </div>
-
-            </div>
-          )}
+                  <InvestmentGainsCharts investmentId={1} />
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-      </div> {/* Este cierra el div className="p-6 space-y-6" */}
+      </div>
     </AppLayout>
   );
 }

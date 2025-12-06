@@ -70,6 +70,7 @@ export default function Dashboard() {
     totalEarnings: 0,
     activeInvestments: 0,
     points: 0,
+    min_points: 100,
     recentTransactions: [],
     investments: []
   });
@@ -144,6 +145,7 @@ export default function Dashboard() {
         activeInvestments: investments.length,
         totalEarnings,
         points: userData.accumulated_points || 0,
+        min_points: parseInt(userData.min_withdrawal_points) || 100,
         points_history: userData.points_history || [],
         recentTransactions: transactions,
         investments: investments.map(inv => ({
@@ -387,7 +389,8 @@ export default function Dashboard() {
               <div className="lg:col-span-5">
                   <QualificationStatus 
                       puntosActuales={dashboardData.points} 
-                      
+                      //calcular puntos minimos desde el backend
+                      puntosMeta={dashboardData.min_points}
                       puntosMeta={93} 
                   />
               </div>
@@ -397,7 +400,6 @@ export default function Dashboard() {
        // Pasamos los datos del backend. Si no existen aún, pasamos un array vacío []
         data={dashboardData.points_history || []} 
        totalAnual={dashboardData.points} // O la suma del historial si prefieres
-       
     /></div>
           </div>
       </div>

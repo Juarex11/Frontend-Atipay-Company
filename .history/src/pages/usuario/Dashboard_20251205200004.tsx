@@ -27,8 +27,8 @@ interface DashboardData {
   balance: number;
   totalEarnings: number;
   activeInvestments: number;
-  points: number;
   
+  points: number;
   points_history?: Array<{ name: string; puntos: number }>;
   recentTransactions: Array<{
     id: number;
@@ -387,7 +387,6 @@ export default function Dashboard() {
               <div className="lg:col-span-5">
                   <QualificationStatus 
                       puntosActuales={dashboardData.points} 
-                      
                       puntosMeta={93} 
                   />
               </div>
@@ -397,7 +396,6 @@ export default function Dashboard() {
        // Pasamos los datos del backend. Si no existen aún, pasamos un array vacío []
         data={dashboardData.points_history || []} 
        totalAnual={dashboardData.points} // O la suma del historial si prefieres
-       
     /></div>
           </div>
       </div>
