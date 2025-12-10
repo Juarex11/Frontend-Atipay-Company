@@ -665,14 +665,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>{" "}
-      <RechargeDialog 
-        open={showRechargeModal} 
-        onOpenChange={setShowRechargeModal}
-        onRechargeSuccess={() => {
-          fetchDashboardData(); // Recarga el saldo en pantalla si la recarga es exitosa
-          // Opcional: mostrar un toast de éxito extra aquí si quieres
-        }}
-      />
       {/* Este cierra el div className="p-6 space-y-6" */}
     </AppLayout>
   );

@@ -335,15 +335,10 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* ===> MODIFICAR ESTA TARJETA (Saldo Disponible) <=== */}
-            <Card
-              onClick={() => setShowRechargeModal(true)} // 1. Al hacer clic, abre el modal
-              className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white border-0 cursor-pointer transition-transform hover:scale-[1.02] shadow-lg hover:shadow-emerald-900/20" // 2. Estilos para indicar que es clickeable
-            >
+            <Card className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/90">
                   Saldo Disponible
-                  {/* Opcional: Agregar un icono pequeño de 'plus' o texto 'Recargar' aquí */}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <AtipayCoin size="sm" className="text-white" />
@@ -562,7 +557,8 @@ export default function Dashboard() {
               </div>
 
               {/* COLUMNA DERECHA: GRÁFICO (60% ancho) */}
-              <div className="lg:col-span-7 p-6 flex flex-col justify-center bg-white">
+             <div className="lg:col-span-7 p-6 flex flex-col justify-center bg-white">
+                
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-blue-500" />
@@ -572,13 +568,13 @@ export default function Dashboard() {
                     Total Año: {dashboardData.points} pts
                   </span>
                 </div>
-
+                
                 {/* CAMBIO AQUÍ: Aumentamos de 300px a 450px para darle más altura */}
-                <div className="w-full h-[450px]">
-                  <AnnualPerformanceChart
-                    data={dashboardData.points_history || []}
-                    totalAnual={dashboardData.points}
-                  />
+                <div className="w-full h-[450px]"> 
+                   <AnnualPerformanceChart
+                      data={dashboardData.points_history || []}
+                      totalAnual={dashboardData.points}
+                   />
                 </div>
               </div>
             </div>
@@ -665,14 +661,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>{" "}
-      <RechargeDialog 
-        open={showRechargeModal} 
-        onOpenChange={setShowRechargeModal}
-        onRechargeSuccess={() => {
-          fetchDashboardData(); // Recarga el saldo en pantalla si la recarga es exitosa
-          // Opcional: mostrar un toast de éxito extra aquí si quieres
-        }}
-      />
       {/* Este cierra el div className="p-6 space-y-6" */}
     </AppLayout>
   );

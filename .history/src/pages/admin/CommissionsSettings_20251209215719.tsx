@@ -134,7 +134,7 @@ export default function CommissionsSettings() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Modificamos el tipo aquí para incluir min_points opcionalmente
-  const [editingSetting, setEditingSetting] = useState<any | null>(null);
+  const [editingSetting, setEditingSetting] = useState<unknown | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -163,6 +163,7 @@ export default function CommissionsSettings() {
 
 
   // ... (handleSaveSetting se mantiene igual, el backend recibirá el campo extra) ...
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveSetting = async (setting: any): Promise<void> => {
     try {
       setIsSubmitting(true);

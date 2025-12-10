@@ -1,8 +1,9 @@
 // src/services/adminSystemService.ts
 
-import { getAuthToken } from '../utils/auth'; 
+import { getAuthToken } from '../utils/auth';
+ // Asegúrate de que esta ruta sea correcta
 
-// Ajusta la URL base si usas variables de entorno
+// Ajusta la URL base si usas variables de entorno, ej: import.meta.env.VITE_API_URL
 const API_BASE = 'http://127.0.0.1:8000/api'; 
 
 const getAuthHeaders = () => {
@@ -16,17 +17,38 @@ const getAuthHeaders = () => {
 
 export const AdminSystemService = {
     
-    // ... (Tus métodos anteriores: getPendingCounts y getMinPointsSetting se quedan igual) ...
+    /**
+     * Obtener contadores para badges (Admin)
+     */
+    async getPendingCounts() {
+        try {
+            const response = await fetch(`${API_BASE}/admin/pending-counts`, {
+                method: 'GET',
+                headers: getAuthHeaders(),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error };
+        }
+    },
 
+    /**
+     * Obtener valor actual de puntos mínimos (Admin)
+     */
     async getMinPointsSetting(): Promise<{ success: boolean; value: number }> {
-        // ... (Tu código existente) ...
         try {
             const response = await fetch(`${API_BASE}/admin/settings/min-points`, {
                 method: 'GET',
                 headers: getAuthHeaders(),
             });
+            
             const data = await response.json();
+            
             if (!response.ok) throw new Error(data.message || 'Error al obtener puntos');
+            
+            // La API devuelve { value: 93 }
             return { success: true, value: data.value };
         } catch (error) {
             console.error(error);
@@ -34,30 +56,27 @@ export const AdminSystemService = {
         }
     },
 
+    /**
+     * Actualizar puntos mínimos (Admin)
+     */
     async updateMinPointsSetting(value: number): Promise<{ success: boolean; message: string }> {
-         // ... (Tu código existente) ...
-         try {
+        try {
             const response = await fetch(`${API_BASE}/admin/settings/min-points`, {
                 method: 'PUT',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ value }),
             });
+
             const data = await response.json();
+
             if (!response.ok) throw new Error(data.message || 'Error al actualizar');
+
             return { success: true, message: data.message };
         } catch (error) {
             return { 
                 success: false, 
                 message: error instanceof Error ? error.message : 'Error desconocido' 
-            };
-        }
-    },
-
-    // =======================================================
-    // ===> AGREGA ESTO AL FINAL (DENTRO DEL OBJETO) <===
-    // =======================================================
-
-    /**
+           /**
      * Actualizar información de cuenta bancaria (Admin)
      * Payload: { value: string }
      */
@@ -84,4 +103,7 @@ export const AdminSystemService = {
             };
         }
     }
-};
+}; 
+            };
+        }
+    }

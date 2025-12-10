@@ -189,13 +189,16 @@ export const createRecharge = async (data: CreateRechargeDto): Promise<CreateRec
     formData.append('proof_image', data.proof_image, data.proof_image.name);
   }
 
-  console.log('Sending FormData...');
+  console.log('Sending FormData with entries:');
+  for (const pair of formData.entries()) {
+    console.log(pair[0], pair[1]);
+  }
 
   // Get the authorization header
   const authHeaders = getAuthHeaders();
   const headers = new Headers();
   
-  // 1. Agregar el Token de Autorización
+  // Only add the authorization header
   const authToken = authHeaders && 'Authorization' in authHeaders 
     ? authHeaders['Authorization'] 
     : null;
@@ -204,49 +207,65 @@ export const createRecharge = async (data: CreateRechargeDto): Promise<CreateRec
     headers.append('Authorization', authToken);
   }
 
-  // 2. ¡ESTO ERA LO QUE FALTABA!
-  // Le decimos a Laravel: "Por favor, respóndeme siempre en JSON, no me redirijas"
-  headers.append('Accept', 'application/json');
-
   try {
+    console.log('Sending request to:', `${API_BASE_URL}/atipay-recharges`);
+    console.log('Request headers:', Object.fromEntries(headers.entries()));
+    
     const response = await fetch(`${API_BASE_URL}/atipay-recharges`, {
       method: 'POST',
-      headers, // Ahora incluye Authorization y Accept
+      headers,
       body: formData,
     });
 
-    // ... El resto de tu código de manejo de respuesta se queda igual ...
     console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
+    // Log response text for debugging
     const responseText = await response.text();
-    let responseData;
+    console.log('Raw response:', responseText);
     
+    let responseData;
     try {
-      responseData = responseText ? JSON.parse(responseText) : {};
+      responseData = JSON.parse(responseText);
+      console.log('Parsed response:', responseData);
     } catch (parseError) {
-      // Si falla aquí es porque Laravel devolvió HTML (error 500 o página de login)
-      console.error('Failed to parse JSON:', parseError);
-      throw new Error('El servidor no respondió con un formato válido. Posible error interno.');
+      console.error('Failed to parse JSON response:', parseError);
+      throw new Error('La respuesta del servidor no es un JSON válido');
     }
     
     if (!response.ok) {
+      console.error('Server responded with error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: responseData
+      });
+      
       if (response.status === 422) {
-        // Manejo de errores de validación de Laravel
+        // Handle validation errors
         const errorMessage = responseData.errors 
           ? Object.values(responseData.errors).flat().join('\n')
-          : responseData.message || 'Error de validación.';
+          : 'Error de validación. Por favor verifica los datos ingresados.';
         throw new Error(errorMessage);
       }
-      throw new Error(responseData.message || `Error del servidor: ${response.status}`);
+      
+      throw new Error(responseData.message || `Error del servidor: ${response.status} ${response.statusText}`);
+    }
+    
+    if (!responseData || !responseData.data) {
+      console.error('Invalid response format:', responseData);
+      throw new Error('Formato de respuesta inválido del servidor');
     }
     
     return responseData.data;
-
   } catch (error) {
     console.error('Error creating recharge:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Error desconocido al crear la recarga');
   }
 };
+
 export interface AdminRecharge extends Recharge {
   user: {
     id: number;

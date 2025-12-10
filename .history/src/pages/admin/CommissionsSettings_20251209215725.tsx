@@ -134,7 +134,7 @@ export default function CommissionsSettings() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Modificamos el tipo aquí para incluir min_points opcionalmente
-  const [editingSetting, setEditingSetting] = useState<any | null>(null);
+  const [editingSetting, setEditingSetting] = useState<unknown | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
