@@ -211,13 +211,8 @@ export const getDashboardReport = async (): Promise<CommissionReportResponse> =>
       'Accept': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    
   });
-  
-  
-  return handleResponse<CommissionReportResponse>(response);
-};
-export const getMinPointsRequired = async (): Promise<number> => {
+  export const getMinPointsRequired = async (): Promise<number> => {
   try {
     const token = localStorage.getItem('token');
     
@@ -242,4 +237,7 @@ export const getMinPointsRequired = async (): Promise<number> => {
     console.error("Error de red obteniendo puntos mínimos:", error);
     return 0;
   }
+};
+  
+  return handleResponse<CommissionReportResponse>(response);
 };

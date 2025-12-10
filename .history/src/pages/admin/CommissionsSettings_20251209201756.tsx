@@ -93,7 +93,7 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
                     <div className="flex items-center gap-2">
                        <Trophy className="w-4 h-4 text-yellow-500" />
                        {/* Si min_points no existe (porque no está en BD), mostramos 0 */}
-                       <span className="font-mono">{(setting as any).min_points || 0} pts</span>
+                       <span className="font-mono">{(setting as unknown).min_points || 0} pts</span>
                     </div>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">

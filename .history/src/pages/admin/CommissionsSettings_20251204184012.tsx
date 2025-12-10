@@ -12,8 +12,6 @@ import {
 } from '@/services/commissionService';
 import CommissionModal from '@/components/admin/CommissionModal';
 import ConfirmationModal from '@/components/admin/ConfirmationModal';
-import { MinPointsEditor } from '../../components/admin/settings/MinPointsEditor';
-
 
 interface CommissionSettingsContentProps {
   isLoading: boolean;
@@ -240,49 +238,36 @@ export default function CommissionsSettings() {
   }
 
   return (
-    <div className="p-6 space-y-8"> {/* Aumentamos espacio vertical para que no se vea apretado */}
-      
-      {/* 1. ENCABEZADO (Igual al que tenías) */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-[#0c4a2a] to-[#0a7e3e] p-6 rounded-lg text-white shadow-md">
+    <div className="p-6 space-y-6">
+       {/* ... (Header y botón agregar se mantienen igual) ... */}
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-[#0c4a2a] to-[#0a7e3e] p-6 rounded-lg text-white">
         <div>
           <h1 className="text-2xl font-bold mb-1">Configuración de Comisiones</h1>
           <p className="text-green-100 text-sm">
-            Gestiona las reglas de negocio para el sistema de afiliados
+            Gestiona porcentajes y puntos mínimos por nivel
           </p>
         </div>
       </div>
 
-      {/* 2. NUEVA SECCIÓN: Regla de Puntos Mínimos */}
-      {/* Aquí insertamos el componente que acabamos de crear */}
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-           <Trophy className="w-5 h-5 text-yellow-600" />
-           <h2 className="text-lg font-bold text-gray-800">Regla de Calificación Global</h2>
-        </div>
-        <MinPointsEditor />
-      </section>
+      <div className="flex justify-end mb-6">
+        <Button 
+          onClick={handleAddNew}
+          className="bg-[#0a7e3e] hover:bg-[#0c4a2a] text-white"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Agregar Nivel
+        </Button>
+      </div>
 
-      {/* Línea divisoria elegante */}
-      <hr className="border-gray-200" />
-
-      {/* 3. SECCIÓN EXISTENTE: Tabla de Niveles */}
-      <section>
-        <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-6 gap-4">
-           <div>
-              <h2 className="text-lg font-bold text-gray-800">Distribución por Niveles</h2>
-              <p className="text-sm text-gray-500">Porcentajes de ganancia según la profundidad de la red</p>
-           </div>
-           
-           <Button 
-             onClick={handleAddNew}
-             className="bg-[#0a7e3e] hover:bg-[#0c4a2a] text-white shadow-sm"
-           >
-             <Plus className="mr-2 h-4 w-4" />
-             Agregar Nivel
-           </Button>
-        </div>
-
+      <div className="lg:col-span-2">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-6 pb-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Niveles de Comisión</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Configura porcentaje y puntos requeridos para calificar
+            </p>
+          </div>
+
           <CommissionSettingsContent
             isLoading={isLoading}
             settings={settings}
@@ -290,9 +275,8 @@ export default function CommissionsSettings() {
             onDeleteSetting={handleDeleteClick}
           />
         </div>
-      </section>
+      </div>
 
-      {/* 4. MODALES (Se quedan igual) */}
       <CommissionModal 
         isOpen={isModalOpen} 
         onClose={() => {

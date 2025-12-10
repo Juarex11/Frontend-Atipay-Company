@@ -14,7 +14,6 @@ import CommissionModal from '@/components/admin/CommissionModal';
 import ConfirmationModal from '@/components/admin/ConfirmationModal';
 import { MinPointsEditor } from '../../components/admin/settings/MinPointsEditor';
 
-
 interface CommissionSettingsContentProps {
   isLoading: boolean;
   settings: CommissionSetting[];

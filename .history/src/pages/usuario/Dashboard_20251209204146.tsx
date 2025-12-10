@@ -10,17 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-// Línea 10 aprox:
-import {
-  Eye,
-  EyeOff,
-  RefreshCw,
-  AlertCircle,
-  Trophy,
-  TrendingUp,
-  Target,
-  CheckCircle2,
-} from "lucide-react";
+import { Eye, EyeOff, RefreshCw, AlertCircle } from "lucide-react";
 import { AtipayCoin } from "@/components/ui/AtipayCoin";
 import { getTransferHistory } from "@/services/walletService";
 import {
@@ -29,10 +19,10 @@ import {
 } from "@/services/investmentService";
 import { getUserProfile, type UserProfile } from "@/services/userService";
 import { API_BASE_URL } from "@/config";
+import QualificationStatus from "@/components/dashboard/QualificationStatus";
 import AnnualPerformanceChart from "@/components/dashboard/AnnualPerformanceChart";
 import InvestmentGainsCharts from "@/components/investments/InvestmentGainsCharts";
 import { getMinPointsRequired } from "../../services/commissionService";
-
 interface Transfer {
   id: number;
   amount: number;
@@ -439,142 +429,28 @@ export default function Dashboard() {
             </Card>
           </div>
         )}
-        {/* ================= SECCIÓN PRO: RENDIMIENTO INTEGRAL ================= */}
         <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800">
-              Rendimiento del Ciclo
-            </h2>
-            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {new Date().toLocaleDateString("es-ES", {
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Tu progreso en la red
+          </h2>
+          {/* Inicio del Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6"></div>
+          {/* Columna Izquierda: Estado de Calificación */}
+          <div className="lg:col-span-5">
+            <QualificationStatus
+              puntosActuales={dashboardData.points}
+              puntosMeta={targetPoints} // <--- ¡AQUÍ ESTÁ EL PROBLEMA! Está fijo en 93
+            />
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-              {/* COLUMNA IZQUIERDA: ESTADO Y METAS (40% ancho) */}
-              <div className="lg:col-span-5 p-6 flex flex-col justify-center bg-gray-50/50">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="p-2 bg-green-100 text-green-700 rounded-lg">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                      Estado de Calificación
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      Meta mensual establecida
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
-                      {dashboardData.points.toLocaleString()}
-                    </span>
-                    <span className="text-sm font-medium text-gray-500">
-                      pts actuales
-                    </span>
-                  </div>
-
-                  {/* Mensaje dinámico */}
-                  {dashboardData.points < targetPoints ? (
-                    <p className="text-sm text-amber-600 font-medium mt-1 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" />
-                      Te faltan {targetPoints - dashboardData.points} pts para
-                      calificar
-                    </p>
-                  ) : (
-                    <p className="text-sm text-green-600 font-medium mt-1 flex items-center gap-1">
-                      <Trophy className="w-3 h-3" />
-                      ¡Has superado la meta por{" "}
-                      {dashboardData.points - targetPoints} pts!
-                    </p>
-                  )}
-                </div>
-
-                {/* Barra de Progreso */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
-                    <span>Progreso</span>
-                    <span>
-                      {Math.min(
-                        (dashboardData.points / (targetPoints || 1)) * 100,
-                        100
-                      ).toFixed(0)}
-                      %
-                    </span>
-                  </div>
-                  <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden shadow-inner">
-                    <div
-                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        dashboardData.points >= targetPoints
-                          ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                          : "bg-gradient-to-r from-amber-400 to-orange-500"
-                      }`}
-                      style={{
-                        width: `${Math.min((dashboardData.points / (targetPoints || 1)) * 100, 100)}%`,
-                      }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-end mt-1">
-                    <span className="text-xs font-medium text-gray-400">
-                      Meta: {targetPoints} pts
-                    </span>
-                  </div>
-                </div>
-
-                {/* Badge Final */}
-                <div className="mt-6">
-                  {dashboardData.points >= targetPoints ? (
-                    <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-lg text-green-800">
-                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold">¡Calificado!</p>
-                        <p className="text-xs opacity-90">
-                          Ya puedes solicitar retiros este mes.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3 p-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600">
-                      <AlertCircle className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-bold">En progreso</p>
-                        <p className="text-xs opacity-90">
-                          Sigue acumulando puntos para desbloquear retiros.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* COLUMNA DERECHA: GRÁFICO (60% ancho) */}
-             <div className="lg:col-span-7 p-6 flex flex-col justify-center bg-white">
-                
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-blue-500" />
-                    Historial de Rendimiento
-                  </h3>
-                  <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    Total Año: {dashboardData.points} pts
-                  </span>
-                </div>
-                
-                {/* CAMBIO AQUÍ: Aumentamos de 300px a 450px para darle más altura */}
-                <div className="w-full h-[450px]"> 
-                   <AnnualPerformanceChart
-                      data={dashboardData.points_history || []}
-                      totalAnual={dashboardData.points}
-                   />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Columna Derecha: Gráfica Anual */}
+            <div className="lg:col-span-7">
+              <AnnualPerformanceChart
+                // Pasamos los datos del backend. Si no existen aún, pasamos un array vacío []
+                data={dashboardData.points_history || []}
+                totalAnual={dashboardData.points} // O la suma del historial si prefieres
+              />
             </div>
           </div>
         </div>

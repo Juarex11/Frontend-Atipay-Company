@@ -13,7 +13,7 @@ import {
 import CommissionModal from '@/components/admin/CommissionModal';
 import ConfirmationModal from '@/components/admin/ConfirmationModal';
 import { MinPointsEditor } from '../../components/admin/settings/MinPointsEditor';
-
+import { Plus, Trash2, Edit, Loader2, Trophy } from 'lucide-react';
 
 interface CommissionSettingsContentProps {
   isLoading: boolean;

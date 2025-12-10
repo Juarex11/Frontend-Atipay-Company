@@ -557,7 +557,7 @@ export default function Dashboard() {
               {/* COLUMNA DERECHA: GRÁFICO (60% ancho) */}
              <div className="lg:col-span-7 p-6 flex flex-col justify-center bg-white">
                 
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-2"> {/* Reduje el margen inferior (mb-2) */}
                   <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-blue-500" />
                     Historial de Rendimiento
@@ -567,8 +567,8 @@ export default function Dashboard() {
                   </span>
                 </div>
                 
-                {/* CAMBIO AQUÍ: Aumentamos de 300px a 450px para darle más altura */}
-                <div className="w-full h-[450px]"> 
+                {/* Contenedor de la gráfica con altura fija y ancho completo */}
+                <div className="w-full h-[300px]">
                    <AnnualPerformanceChart
                       data={dashboardData.points_history || []}
                       totalAnual={dashboardData.points}

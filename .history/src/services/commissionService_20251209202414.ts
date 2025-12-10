@@ -217,29 +217,3 @@ export const getDashboardReport = async (): Promise<CommissionReportResponse> =>
   
   return handleResponse<CommissionReportResponse>(response);
 };
-export const getMinPointsRequired = async (): Promise<number> => {
-  try {
-    const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${API_BASE_URL}/affiliate/min-points-required`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-        // Si hay error (ej. 404 o 500), devolvemos 0 para no romper la UI
-        console.warn('No se pudo obtener la meta de puntos, usando valor por defecto.');
-        return 0; 
-    }
-
-    const data = await response.json();
-    // La API devuelve { "min_points": 20 }
-    return data.min_points || 0; 
-  } catch (error) {
-    console.error("Error de red obteniendo puntos mínimos:", error);
-    return 0;
-  }
-};
