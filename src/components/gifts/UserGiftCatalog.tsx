@@ -1,24 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Gift, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Gift as GiftIcon, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { giftService } from '../../services/giftService';
 import { GiftDetailsModal } from './GiftDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
-
-interface Gift {
-  id: number;
-  name: string;
-  description: string;
-  redeem_points: number;
-  stock: number;
-  image_url: string;
-}
+import type { Gift } from '../../types/gift';
 
 interface RewardRequest {
   id: number;
   user_id: number;
   reward_id: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'claimed';
   admin_message?: string;
   reward: {
     id: number;
@@ -33,6 +25,7 @@ const UserGiftCatalog = () => {
   const [selectedGift, setSelectedGift] = useState<Gift | null>(null);
   const [viewingGift, setViewingGift] = useState<Gift | null>(null);
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [claimingRequestId, setClaimingRequestId] = useState<number | null>(null);
   const [rewardRequests, setRewardRequests] = useState<RewardRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'catalog' | 'history'>('catalog');
   const { user } = useAuth();
@@ -87,12 +80,15 @@ const UserGiftCatalog = () => {
   };
 
   const getRequestStatus = (giftId: number) => {
-    const request = rewardRequests.find(req => req.reward_id === giftId);
+    const request = rewardRequests.find(
+      req => req.reward_id === giftId && (req.status === 'pending' || req.status === 'approved')
+    );
     if (!request) return null;
 
     return {
       status: request.status,
-      message: request.admin_message
+      message: request.admin_message,
+      requestId: request.id
     };
   };
 
@@ -133,6 +129,38 @@ const UserGiftCatalog = () => {
     }
   };
 
+  const handleClaimRequest = async (requestId: number) => {
+    if (claimingRequestId !== null) return;
+
+    setClaimingRequestId(requestId);
+
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/reward-requests/${requestId}/claim`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al reclamar el regalo');
+      }
+
+      toast.success(data.message || 'Regalo reclamado exitosamente');
+      await Promise.all([fetchRewardRequests(), giftService.getGifts().then(setGifts)]);
+
+    } catch (error) {
+      console.error('Error claiming gift:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al reclamar el regalo');
+    } finally {
+      setClaimingRequestId(null);
+    }
+  };
+
 
   const handleGiftClick = (gift: Gift) => {
     setViewingGift(gift);
@@ -162,6 +190,13 @@ const UserGiftCatalog = () => {
             Aprobado
           </span>
         );
+      case 'claimed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            <GiftIcon className="w-3 h-3 mr-1" />
+            Reclamado
+          </span>
+        );
       case 'rejected':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -181,7 +216,7 @@ const UserGiftCatalog = () => {
         onClose={() => setViewingGift(null)}
         gift={viewingGift}
         onRedeem={viewingGift ? () => handleRedeemRequest(viewingGift) : undefined}
-        requestStatus={viewingGift ? getRequestStatus(viewingGift.id) : null}
+        requestStatus={viewingGift ? getRequestStatus(Number(viewingGift.id)) : null}
       />
 
       <div className="text-center mb-8">
@@ -216,7 +251,7 @@ const UserGiftCatalog = () => {
         <div>
           {gifts.length === 0 ? (
             <div className="text-center py-8">
-              <Gift className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <GiftIcon className="mx-auto h-12 w-12 text-gray-300 mb-3" />
               <p className="text-gray-400 text-sm">No hay recompensas disponibles en este momento</p>
             </div>
           ) : (
@@ -240,14 +275,18 @@ const UserGiftCatalog = () => {
                           className="w-full h-full object-contain max-h-[120px]"
                         />
                       ) : (
-                        <Gift className="h-10 w-10 text-gray-300" />
+                        <GiftIcon className="h-10 w-10 text-gray-300" />
                       )}
                     </div>
-                    <div className="absolute bottom-2 right-2">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${gift.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                        {gift.stock > 0 ? gift.stock : '0'}
-                      </span>
+                    <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${gift.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>Stock: {gift.stock > 0 ? gift.stock : '0'}</span>
+                      {gift.redemption_info ? (
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${gift.redemption_info.remaining_redeems > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                          N° Canjes: {gift.redemption_info.remaining_redeems}/{gift.max_redeem}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">Máx: {gift.max_redeem}</span>
+                      )}
                     </div>
                   </div>
 
@@ -261,12 +300,45 @@ const UserGiftCatalog = () => {
 
                     <div className="mt-auto">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-blue-600">{gift.redeem_points} pts</span>
+                        <span className="text-sm font-bold text-blue-600">{gift.redeem_points ?? 0} pts</span>
                       </div>
                       {(() => {
-                        const request = getRequestStatus(gift.id);
+                        const redemptionInfo = gift.redemption_info;
+                        const request = getRequestStatus(Number(gift.id));
 
-                        if (request) {
+                        // si la solicitud es aprobada, que aparezca el boton de reclamar
+                        if (request && request.status === 'approved') {
+                          return (
+                            <div className="text-center">
+                              <div className="mb-1">
+                                {renderStatusBadge(request.status)}
+                              </div>
+                              {request.message && (
+                                <p className="text-xs text-gray-500 truncate mb-2" title={request.message}>
+                                  {request.message}
+                                </p>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleClaimRequest(request.requestId);
+                                }}
+                                disabled={claimingRequestId !== null}
+                                className={`w-full py-1.5 px-2 text-xs rounded-md font-medium transition-colors bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 ${claimingRequestId === request.requestId ? 'opacity-70' : ''}`}
+                                aria-label={`Reclamar ${gift.name}`}
+                              >
+                                {claimingRequestId === request.requestId ? (
+                                  <span className="inline-block h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1"></span>
+                                ) : (
+                                  'Reclamar Regalo'
+                                )}
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // si la solicitud está pendiente
+                        if (request && request.status === 'pending') {
                           return (
                             <div className="text-center">
                               <div className="mb-1">
@@ -281,14 +353,27 @@ const UserGiftCatalog = () => {
                           );
                         }
 
+                        // si llegó al limite de canjes
+                        if (redemptionInfo?.has_reached_limit) {
+                          return (
+                            <div className="text-center">
+                              <div className="mb-1">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-500">
+                                  Límite de canjes alcanzado
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         return (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRedeemRequest(gift);
                             }}
-                            disabled={gift.stock === 0 || isRedeeming}
-                            className={`w-full py-1.5 px-2 text-xs rounded-md font-medium transition-colors ${gift.stock === 0
+                            disabled={gift.stock === 0 || isRedeeming || !redemptionInfo?.can_redeem}
+                            className={`w-full py-1.5 px-2 text-xs rounded-md font-medium transition-colors ${gift.stock === 0 || !redemptionInfo?.can_redeem
                                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                 : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
                               } ${isRedeeming && selectedGift?.id === gift.id ? 'opacity-70' : ''}`}
@@ -318,7 +403,7 @@ const UserGiftCatalog = () => {
 
           {rewardRequests.length === 0 ? (
             <div className="text-center py-12">
-              <Gift className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <GiftIcon className="mx-auto h-12 w-12 text-gray-300 mb-3" />
               <p className="text-gray-500">No tienes solicitudes recientes</p>
             </div>
           ) : (
