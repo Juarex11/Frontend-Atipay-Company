@@ -1,5 +1,18 @@
 import { API_BASE_URL } from '../config';
 
+export interface TransactionHistoryItem {
+  id: number;
+  type: 'commission' | 'withdrawal';
+  date: string;
+  amount: string; // El backend suele enviar decimales como string
+  status: string;
+  // Estos campos vienen solo si es comisión
+  level?: number;
+  points?: number;
+  source_type?: string;
+  from_user?: string;
+}
+
 interface ErrorResponse {
   message?: string;
   [key: string]: unknown;
@@ -128,6 +141,23 @@ export const getCommissionSettings = async (): Promise<CommissionSetting[]> => {
   });
   
   return handleResponse<CommissionSetting[]>(response);
+};
+
+// === FUNCIÓN PARA OBTENER EL HISTORIAL COMBINADO ===
+export const getHistory = async (): Promise<TransactionHistoryItem[]> => {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_BASE_URL}/commissions/history`, {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  
+  // Usamos tu helper handleResponse, pero extraemos la propiedad 'data'
+  // porque tu backend devuelve { success: true, data: [...] }
+  const jsonResponse = await handleResponse<{ success: boolean; data: TransactionHistoryItem[] }>(response);
+  return jsonResponse.data;
 };
 
 export const createCommissionSetting = async (data: Omit<CommissionSetting, 'id' | 'created_at' | 'updated_at'>): Promise<CommissionSetting> => {

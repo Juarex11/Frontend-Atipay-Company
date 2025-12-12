@@ -1,5 +1,8 @@
 import { getAuthToken } from '../utils/auth';
 
+// Asegúrate de que esta URL sea la correcta para tu backend
+const API_BASE = 'http://127.0.0.1:8000/api'; 
+
 export interface DepositRequest {
   id: number;
   user_id: number;
@@ -34,8 +37,6 @@ export interface DepositRequest {
   };
 }
 
-const API_BASE = 'http://127.0.0.1:8000/api';
-
 const getAuthHeaders = () => {
   const token = getAuthToken();
   return {
@@ -48,6 +49,7 @@ export const DepositService = {
 
   /**
    * Obtener información de la cuenta bancaria del sistema
+   * CORREGIDO: Ahora soporta { bank_info: "..." }
    */
   async getBankInfo(): Promise<{
     success: boolean;
@@ -56,11 +58,6 @@ export const DepositService = {
     error?: string;
   }> {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autenticado');
-      }
-
       const response = await fetch(`${API_BASE}/system/bank-info`, {
         method: 'GET',
         headers: getAuthHeaders(),
@@ -76,14 +73,30 @@ export const DepositService = {
         };
       }
 
-      // Tu backend puede devolver { data: "..." } o { value: "..." }
-      // Esta línea asegura que capturemos el texto correctamente
-      const bankText = responseData.data || responseData.value || '';
+      // ===> AQUÍ ESTÁ LA CORRECCIÓN <===
+      // Buscamos el texto exacto para que React no falle
+      let bankText = '';
+
+      if (typeof responseData === 'string') {
+        bankText = responseData;
+      } else if (responseData && typeof responseData === 'object') {
+        // Tu backend devuelve { bank_info: "..." }, así que buscamos esa clave
+        if (responseData.bank_info) {
+          bankText = responseData.bank_info;
+        } else if (responseData.value) {
+          bankText = responseData.value;
+        } else if (responseData.data) {
+          bankText = responseData.data;
+        } else {
+          // Si no encuentra nada conocido, convierte el objeto a texto para no romper la app
+          bankText = JSON.stringify(responseData);
+        }
+      }
 
       return {
         success: true,
         message: 'Información obtenida exitosamente',
-        data: bankText,
+        data: bankText, 
       };
     } catch (error) {
       console.error('Error fetching bank info:', error);
@@ -93,6 +106,7 @@ export const DepositService = {
       };
     }
   },
+
   /**
    * Crear solicitud de compra con método de pago "deposit"
    */
@@ -103,17 +117,11 @@ export const DepositService = {
     error?: string;
   }> {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autenticado');
-      }
-
       const response = await fetch(`${API_BASE}/products/purchase`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
           product_id: productId,
@@ -127,14 +135,14 @@ export const DepositService = {
       if (!response.ok) {
         return {
           success: false,
-          message: responseData.message || responseData.error || 'Error al crear solicitud de depósito',
+          message: responseData.message || responseData.error || 'Error al crear solicitud',
           error: responseData.error,
         };
       }
 
       return {
         success: true,
-        message: responseData.message || 'Solicitud de depósito creada exitosamente',
+        message: responseData.message || 'Solicitud creada exitosamente',
         data: responseData,
       };
     } catch (error) {
@@ -156,12 +164,6 @@ export const DepositService = {
     error?: string;
   }> {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autenticado');
-      }
-
-      // Validar que sea imagen
       if (!file.type.startsWith('image/')) {
         return {
           success: false,
@@ -169,11 +171,10 @@ export const DepositService = {
         };
       }
 
-      // Validar tamaño (máximo 4MB)
-      if (file.size > 4 * 1024 * 1024) {
+      if (file.size > 5 * 1024 * 1024) {
         return {
           success: false,
-          message: 'La imagen no debe pesar más de 4MB',
+          message: 'La imagen no debe pesar más de 5MB',
         };
       }
 
@@ -183,7 +184,8 @@ export const DepositService = {
       const response = await fetch(`${API_BASE}/deposits/${depositId}/upload-proof`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          // No incluimos Content-Type para que el navegador ponga el boundary correcto
+          'Authorization': `Bearer ${getAuthToken()}`,
           'Accept': 'application/json',
         },
         body: formData,
@@ -223,11 +225,6 @@ export const DepositService = {
     error?: string;
   }> {
     try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autenticado');
-      }
-
       const response = await fetch(`${API_BASE}/deposits/my-requests`, {
         method: 'GET',
         headers: getAuthHeaders(),
@@ -268,22 +265,17 @@ export const DepositService = {
     error?: string;
   }> {
     try {
-      const response = await fetch(`${API_BASE}/deposits/my-requests`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
+      // Reutilizamos getMyDepositRequests para buscar la solicitud
+      const response = await DepositService.getMyDepositRequests();
+      
+      if (!response.success || !response.data) {
         return {
           success: false,
           message: 'Error al obtener estado',
         };
       }
 
-      const requests = await response.json();
-      const deposit = Array.isArray(requests)
-        ? requests.find((r: DepositRequest) => r.id === depositId)
-        : requests.data?.find((r: DepositRequest) => r.id === depositId);
+      const deposit = response.data.find((r: DepositRequest) => r.id === depositId);
 
       if (!deposit) {
         return {
@@ -314,25 +306,10 @@ export const DepositService = {
     message: string;
     error?: string;
   }> {
-    try {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('No autenticado');
-      }
-
-      // Por ahora no hay endpoint de cancelación en el backend
-      // Este método puede ser implementado después
-      return {
-        success: false,
-        message: 'Funcionalidad no disponible aún',
-      };
-    } catch (error) {
-      console.error('Error canceling deposit request:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Error desconocido',
-      };
-    }
+    return {
+      success: false,
+      message: 'Funcionalidad no disponible aún',
+    };
   },
 };
 
