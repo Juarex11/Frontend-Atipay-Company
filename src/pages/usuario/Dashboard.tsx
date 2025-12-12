@@ -94,7 +94,43 @@ export default function Dashboard() {
     recentTransactions: [],
     investments: [],
   });
-  const [targetPoints, setTargetPoints] = useState(0); // Nuevo estado para la meta
+  const [targetPoints, setTargetPoints] = useState(0); // Nuev
+  // // === NUEVO: Estados para el filtro de años ===
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [chartHistory, setChartHistory] = useState<
+    Array<{ name: string; points: number; qualified: boolean }>
+  >([]);
+
+  // === NUEVO: Función para traer el historial específico por año ===
+  useEffect(() => {
+    const fetchHistoryByYear = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        // Ajusta la URL si tu ruta en api.php es diferente (ej: /affiliate/history)
+        const response = await fetch(
+          `${API_BASE_URL}/affiliate/history?year=${selectedYear}`,
+          {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          // Si tu backend devuelve { history: [...], ... } usa data.history
+          // Si devuelve directo el array, usa data
+          setChartHistory(data.history || data);
+        }
+      } catch (error) {
+        console.error("Error cargando historial del año:", error);
+      }
+    };
+
+    fetchHistoryByYear();
+  }, [selectedYear]); // Se ejecuta cada vez que cambias el año
+  // o estado para la meta
 
   // Nuevo useEffect para cargar la meta dinámica
   useEffect(() => {
@@ -253,6 +289,18 @@ export default function Dashboard() {
       </div>
     );
   };
+
+  // 1. Convertimos la data vieja (puntos) al formato nuevo (points)
+  const initialData = (dashboardData.points_history || []).map((item) => ({
+    name: item.name,
+    points: item.puntos, // <--- AQUÍ CAMBIAMOS EL NOMBRE
+    qualified: false,
+    month: 0,
+  }));
+
+  // 2. Decidimos qué mostrar: ¿Lo que trajo el filtro o lo inicial?
+  const chartDataToDisplay =
+    chartHistory.length > 0 ? chartHistory : initialData;
 
   return (
     <AppLayout>
@@ -576,8 +624,9 @@ export default function Dashboard() {
                 {/* CAMBIO AQUÍ: Aumentamos de 300px a 450px para darle más altura */}
                 <div className="w-full h-[450px]">
                   <AnnualPerformanceChart
-                    data={dashboardData.points_history || []}
-                    totalAnual={dashboardData.points}
+                    data={chartDataToDisplay} // <--- Usamos la data arreglada
+                    year={selectedYear} // <--- Usamos la variable que daba error "unused"
+                    onYearChange={setSelectedYear} // <--- Conectamos el selector
                   />
                 </div>
               </div>
@@ -665,8 +714,8 @@ export default function Dashboard() {
           )}
         </div>
       </div>{" "}
-      <RechargeDialog 
-        open={showRechargeModal} 
+      <RechargeDialog
+        open={showRechargeModal}
         onOpenChange={setShowRechargeModal}
         onRechargeSuccess={() => {
           fetchDashboardData(); // Recarga el saldo en pantalla si la recarga es exitosa
