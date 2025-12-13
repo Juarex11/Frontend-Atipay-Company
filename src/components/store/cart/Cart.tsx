@@ -30,6 +30,17 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
     clearCart,
   } = useCart();
 
+  // --- INICIO DE MODIFICACIÓN: RF-07 Puntos Totales ---
+  const getCartPointsEarned = () => {
+    return cart.reduce((totalPoints, item) => {
+      const itemPoints = item.pointsEarned ? item.pointsEarned : 0;
+      return totalPoints + itemPoints * item.quantity;
+    }, 0);
+  }
+
+  const totalPointsEarned = getCartPointsEarned();
+  // --- FIN DE MODIFICACIÓN: RF-07 Puntos Totales ---
+
   // Datos bancarios editables
   const bankInfo = {
     bank: "BCP - Banco de Crédito del Perú",
@@ -147,6 +158,20 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                           <AtipayCoin size="xs" />
                           <span className="text-green-700">{formatCurrency(item.price)} unidad</span>
                         </div>
+
+                        {/* --- INICIO DE MODIFICACIÓN: Puntos Ganados por Producto --- */}
+                        {item.pointsEarned && item.pointsEarned > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-yellow-600">
+                            <svg className="w-3.5 h-3.5 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
+                            </svg>
+                            <span className="font-semibold text-yellow-700">
+                              Ganas: {item.pointsEarned * item.quantity} Puntos
+                            </span>
+                          </div>
+                        )}
+                        {/* --- FIN DE MODIFICACIÓN: Puntos Ganados por Producto --- */}
+
                         <div className="mt-2 flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -188,6 +213,24 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                       <span className="font-bold text-xl text-green-700">{formatCurrency(getCartTotal())}</span>
                     </div>
                   </div>
+
+                  {/* --- INICIO DE MODIFICACIÓN: RF-07 Puntos Ganados --- */}
+                  {totalPointsEarned > 0 && (
+                    <div className="flex justify-between items-center py-2 border-t border-green-200/50">
+                      <span className="text-green-800 font-medium flex items-center gap-1">
+                        Puntos que ganarás
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-5 h-5 text-yellow-600 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
+                        </svg>
+                        <span className="font-bold text-xl text-yellow-700">
+                          {totalPointsEarned.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {/* --- FIN DE MODIFICACIÓN: RF-07 Puntos Ganados --- */}
 
                   {/* Payment Method */}
                   <div className="mt-4 space-y-3">
