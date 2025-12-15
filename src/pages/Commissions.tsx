@@ -10,6 +10,7 @@ import { getUserProfile } from '@/services/userService';
 import { toast } from '@/components/ui/use-toast';
 import { AtipayCoin } from '@/components/ui/AtipayCoin';
 import type { CommissionHistoryItem } from '../types/commission';
+
 interface UnwithdrawnCommission {
   id: number;
   user_id: number;
@@ -129,14 +130,11 @@ const Commissions: React.FC = () => {
       const [summaryRes, historyRes, profileRes] = await Promise.all([
         getCommissionSummary(),
         getUnwithdrawnHistory().then(response => {
-          // Transform the API response to match our expected format
           if (response && response.history) {
             const historyData = response.history;
-            // If it's already in the expected format, return as is
             if (typeof historyData === 'object' && !Array.isArray(historyData)) {
               return { history: historyData };
             }
-            // Otherwise, transform the array format
             const transformedHistory: { [key: string]: { total: number; comisiones: UnwithdrawnCommission[] } } = {};
 
             (historyData as Array<{ month: string | number; year: number; amount: string }>).forEach(item => {
@@ -218,7 +216,7 @@ const Commissions: React.FC = () => {
           title: '¡Éxito!',
           description: `¡Has retirado $${result.amount} con éxito!`,
         });
-        fetchData(); // Refresh data
+        fetchData();
         fetchCommissionHistory(); 
       } else {
         toast({
@@ -275,9 +273,7 @@ const Commissions: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {/* Pending Card */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden border border-green-100 hover:shadow-lg transition-shadow duration-300">
           <div className="p-6">
             <div className="flex items-center">
@@ -305,7 +301,6 @@ const Commissions: React.FC = () => {
           </div>
         </div>
 
-        {/* Withdrawn Card */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden border border-green-100 hover:shadow-lg transition-shadow duration-300">
           <div className="p-6">
             <div className="flex items-center">
@@ -329,7 +324,6 @@ const Commissions: React.FC = () => {
           </div>
         </div>
 
-        {/* Available for Withdrawal */}
         <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl shadow-lg overflow-hidden md:col-span-2 lg:col-span-1">
           <div className="p-6">
             <div className="flex items-center justify-between">
@@ -359,7 +353,6 @@ const Commissions: React.FC = () => {
         </div>
       </div>
 
-      {/* Unwithdrawn Commissions Table */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg md:text-xl font-semibold text-gray-800 flex items-center">
@@ -483,7 +476,6 @@ const Commissions: React.FC = () => {
         )}
       </div>
 
-      {/* Withdrawal History Table */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 mt-6">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg md:text-xl font-semibold text-gray-800 flex items-center">

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,16 +18,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, Copy, CheckCircle2, Building2, AlertCircle, ArrowRight, Wallet, ShieldCheck, Smartphone } from "lucide-react";
 import { createRecharge } from "@/services/atipayRechargeService";
+import { DepositService } from "@/services/depositService";
 import { useToast } from "@/components/ui/use-toast";
-import { DepositBankInfo } from "./DepositBankInfo";
 
 interface RechargeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRechargeSuccess?: () => void;
 }
+
+// 1. ESTILOS VISUALES (Colores e Iconos)
+const METHOD_STYLES: Record<string, { color: string; label: string; icon: any }> = {
+  "1": { color: "bg-purple-700", label: "Yape Oficial", icon: Smartphone },
+  "3": { color: "bg-orange-500", label: "Plin Oficial", icon: Smartphone },
+  "4": { color: "bg-slate-900", label: "Cuenta Recaudadora", icon: Building2 },
+};
+
+// 2. DATOS FIJOS (Para Yape y Plin según tu imagen)
+// Si en el futuro quieres que esto venga de BD, habría que crear un endpoint nuevo.
+// Por ahora, esto es lo más rápido y efectivo.
+const STATIC_INFO: Record<string, string> = {
+  "1": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe", // Datos de Yape
+  "3": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe", // Datos de Plin (Asumimos el mismo número)
+};
 
 export function RechargeDialog({
   open,
@@ -36,33 +52,85 @@ export function RechargeDialog({
   const [amount, setAmount] = useState<string>("");
   const [paymentMethodId, setPaymentMethodId] = useState<string>("");
   const [proofImage, setProofImage] = useState<File | null>(null);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Info a mostrar en la tarjeta
+  const [displayInfo, setDisplayInfo] = useState<string | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Lógica inteligente para cargar la información
+  useEffect(() => {
+    // Si elegimos un método válido (1, 3 o 4)
+    if (["1", "3", "4"].includes(paymentMethodId)) {
+      
+      // CASO A: Es Yape (1) o Plin (3) -> Usamos la info estática (Instantáneo)
+      if (STATIC_INFO[paymentMethodId]) {
+        setDisplayInfo(STATIC_INFO[paymentMethodId]);
+        setLoadingInfo(false);
+      } 
+      // CASO B: Es Transferencia (4) -> Consultamos al Backend (System Settings)
+      else if (paymentMethodId === "4") {
+  const fetchBank = async () => {
+    setLoadingInfo(true);
+    try {
+      // 1. Llamamos al servicio que conecta con la Base de Datos
+      const res = await DepositService.getBankInfo();
+      
+      // 2. Si la BD responde, actualizamos el estado
+      if (res.success && res.data) {
+        setDisplayInfo(res.data); // <--- ¡AQUÍ SE PONE EL DATO DE LA BD!
+      } else {
+        // Fallback por si la BD está vacía
+        setDisplayInfo("La cuenta bancaria no está configurada. Contacte a soporte.");
+      }
+    } catch (e) {
+      console.error(e);
+      setDisplayInfo("Error de conexión.");
+    } finally {
+      setLoadingInfo(false);
+    }
+  };
+  fetchBank();
+}
+    } else {
+      setDisplayInfo(null);
+    }
+  }, [paymentMethodId]);
 
   const resetForm = () => {
     setAmount("");
     setPaymentMethodId("");
     setProofImage(null);
     setError(null);
+    setDisplayInfo(null);
+  };
+
+  const handleCopy = () => {
+    if (displayInfo) {
+      navigator.clipboard.writeText(displayInfo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validar tipo de archivo
       const validTypes = ["image/jpeg", "image/png", "application/pdf"];
       if (!validTypes.includes(file.type)) {
         setError("Por favor sube una imagen (JPEG, PNG) o un PDF");
         return;
       }
-
-      // Validar tamaño (máximo 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError("El archivo es demasiado grande. El tamaño máximo es 5MB");
+        setError("El archivo es demasiado grande (Máx 5MB)");
         return;
       }
-
       setProofImage(file);
       setError(null);
     }
@@ -70,161 +138,164 @@ export function RechargeDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!amount || !proofImage || !paymentMethodId) {
-      setError(
-        "Por favor completa todos los campos y selecciona un método de pago"
-      );
+      setError("Completa todos los campos");
       return;
     }
 
     setIsLoading(true);
-    setError(null);
-
     try {
       await createRecharge({
         amount: parseFloat(amount),
         user_payment_method_id: paymentMethodId,
-        full_names: "Usuario", // You might want to get this from user context
+        full_names: "Usuario", 
         proof_image: proofImage,
       });
 
-      toast({
-        title: "Solicitud de recarga enviada",
-        description:
-          "Tu solicitud de recarga ha sido enviada y está siendo revisada.",
-      });
-
+      toast({ title: "Solicitud enviada", description: "Tu recarga será validada pronto." });
       resetForm();
       onOpenChange(false);
       onRechargeSuccess?.();
     } catch (err: unknown) {
-      console.error("Error al crear la recarga:", err);
-      const errorMessage =
-        err && typeof err === "object" && "message" in err
-          ? String(err.message)
-          : "Ocurrió un error al procesar la recarga. Por favor, inténtalo de nuevo.";
-      setError(errorMessage);
+      const msg = err && typeof err === "object" && "message" in err ? String(err.message) : "Error al procesar.";
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Obtener estilos según ID
+  const currentStyle = METHOD_STYLES[paymentMethodId] || { color: "bg-slate-900", label: "Información", icon: Wallet };
+  const HeaderIcon = currentStyle.icon;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Recargar Saldo</DialogTitle>
-          <DialogDescription>
-            Completa los siguientes campos para solicitar una recarga de saldo.
-          </DialogDescription>
+          <DialogDescription>Ingresa el monto y sube tu voucher.</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5 mt-2">
+          {/* MONTO */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Monto a recargar (S/.)</Label>
-            <Input
-              id="amount"
-              type="number"
-              min="1"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Ej: 100.00"
-              disabled={isLoading}
-            />
+            <Label htmlFor="amount">Monto (S/.)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">S/</span>
+              <Input
+                id="amount"
+                type="number"
+                min="1"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="pl-9 text-lg font-medium"
+                disabled={isLoading}
+              />
+            </div>
           </div>
 
+          {/* MÉTODO DE PAGO */}
           <div className="space-y-2">
             <Label htmlFor="method">Método de pago</Label>
-            <Select
-              value={paymentMethodId}
-              onValueChange={setPaymentMethodId}
-              disabled={isLoading}
-            >
+            <Select value={paymentMethodId} onValueChange={setPaymentMethodId} disabled={isLoading}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona un método" />
               </SelectTrigger>
               <SelectContent>
-                {/* ID 1 es Yape en tu base de datos */}
                 <SelectItem value="1">Yape</SelectItem>
-
-                {/* ID 3 será Plin (lo acabamos de crear) */}
                 <SelectItem value="3">Plin</SelectItem>
-
-                {/* ID 4 será Transferencia (lo acabamos de crear) */}
                 <SelectItem value="4">Transferencia bancaria</SelectItem>
-
-                <SelectItem value="2">Otro</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* ===> ACTUALIZA LA CONDICIÓN DE LA TARJETA AZUL AQUÍ <=== */}
-          {paymentMethodId === "4" && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-300 my-2">
-              <DepositBankInfo />
+          {/* TARJETA DE INFORMACIÓN DINÁMICA */}
+          {["1", "3", "4"].includes(paymentMethodId) && (
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+              {loadingInfo ? (
+                <div className="h-32 bg-slate-50 animate-pulse rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Obteniendo datos...
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+                  {/* Cabecera de Color (Morado/Naranja/Negro) */}
+                  <div className={`${currentStyle.color} px-4 py-3 flex items-center justify-between transition-colors duration-300`}>
+                    <div className="flex items-center gap-2 text-white">
+                      <div className="p-1.5 bg-white/20 rounded shadow-lg backdrop-blur-sm">
+                        <HeaderIcon size={16} className="text-white"/>
+                      </div>
+                      <span className="text-sm font-semibold tracking-wide text-white/90">{currentStyle.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white/10 border border-white/20 px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider">
+                      <ShieldCheck size={10}/> <span>Verificado</span>
+                    </div>
+                  </div>
+
+                  {/* Cuerpo Info */}
+                  <div className="p-4 bg-gradient-to-b from-white to-slate-50/50">
+                    <div className="relative mb-3 group">
+                      {/* Aquí se muestra la info del objeto STATIC_INFO o del Backend */}
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-mono text-xs leading-relaxed whitespace-pre-wrap shadow-inner min-h-[60px]">
+                        {displayInfo}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="absolute top-2 right-2 p-1.5 bg-white rounded border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-400 shadow-sm transition-all"
+                        title="Copiar texto"
+                      >
+                        {copied ? <CheckCircle2 size={14} className="text-green-600"/> : <Copy size={14}/>}
+                      </button>
+                    </div>
+
+                    {/* Botón Historial */}
+                    <div className="pt-2 border-t border-slate-100 mt-2">
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => navigate('/transactions')} 
+                          className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 text-xs font-medium border border-dashed border-blue-200"
+                        >
+                          <Wallet size={12} className="mr-2"/>
+                          Ver Historial de Transacciones
+                          <ArrowRight size={12} className="ml-1 opacity-50"/>
+                        </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {/* ======================================================= */}
 
+          {/* COMPROBANTE */}
           <div className="space-y-2">
-            <Label htmlFor="proof">Comprobante de pago</Label>
-            <div className="flex items-center gap-2">
-              <Label
-                htmlFor="proof"
-                className="flex flex-1 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-gray-300 p-4 text-center hover:border-primary hover:bg-accent hover:text-accent-foreground"
-              >
-                <Upload className="mb-2 h-6 w-6" />
-                <span className="text-sm">
-                  {proofImage
-                    ? proofImage.name
-                    : "Haz clic para subir un archivo"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {proofImage
-                    ? "Haz clic para cambiar"
-                    : "Formatos: JPG, PNG o PDF (máx. 5MB)"}
-                </span>
-                <Input
-                  id="proof"
-                  type="file"
-                  accept="image/jpeg,image/png,application/pdf"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  disabled={isLoading}
-                />
-              </Label>
-            </div>
+            <Label htmlFor="proof">Comprobante</Label>
+            <Label
+              htmlFor="proof"
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-all ${
+                proofImage ? "border-green-500 bg-green-50" : "border-slate-300 hover:border-blue-500 hover:bg-blue-50"
+              }`}
+            >
+              {proofImage ? <CheckCircle2 className="mb-2 h-8 w-8 text-green-500"/> : <Upload className="mb-2 h-8 w-8 text-slate-400"/>}
+              <span className="text-sm font-medium text-slate-700">{proofImage ? proofImage.name : "Clic para subir imagen"}</span>
+              <span className="text-xs text-slate-400 mt-1">{proofImage ? "Listo para enviar" : "JPG, PNG (Máx. 5MB)"}</span>
+              <Input id="proof" type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={isLoading} />
+            </Label>
           </div>
 
           {error && (
-            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-              {error}
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600 border border-red-200 flex items-center gap-2">
+              <AlertCircle size={16}/> {error}
             </div>
           )}
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading || !amount || !proofImage}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                "Solicitar recarga"
-              )}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Cancelar</Button>
+            <Button type="submit" disabled={isLoading || !amount || !proofImage || !paymentMethodId} className="bg-green-600 hover:bg-green-700 text-white">
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Procesando...</> : "Solicitar recarga"}
             </Button>
           </DialogFooter>
         </form>
