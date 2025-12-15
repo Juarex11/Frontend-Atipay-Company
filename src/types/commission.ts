@@ -75,3 +75,37 @@ export interface CommissionReportResponse {
   por_usuario: UserCommissionStat[];
   detalle: CommissionDetailItem[];
 }
+// historial de comisiones
+export interface CommissionHistoryItem {
+  id: number;
+  fecha: string;
+  nivel: string;
+  monto: number;
+  puntos_generados: number;
+  origen: string;
+  estado: string;
+  source_type: string;
+}
+
+// respuesta del historial de comisiones
+export interface CommissionHistoryResponse {
+  success: boolean;
+  data: CommissionHistoryItem[];
+}
+
+// historial de retiros
+export interface WithdrawalHistoryItem {
+  id: number;
+  user_id: number;
+  amount: string;
+  month: number;
+  year: number;
+  withdrawn_at: string;
+}
+
+// respuesta del historial de retiros
+export interface WithdrawalHistoryResponse {
+  success: boolean;
+  message?: string;
+  history?: WithdrawalHistoryItem[];
+}

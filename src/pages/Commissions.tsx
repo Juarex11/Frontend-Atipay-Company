@@ -3,7 +3,10 @@ import {
   getCommissionSummary,
   getUnwithdrawnHistory,
   withdrawCommissions,
+  getCommissionHistory,
+  getWithdrawalHistory,
 } from '../services/commissionService';
+import type { CommissionHistoryItem } from '../types/commission';
 interface UnwithdrawnCommission {
   id: number;
   user_id: number;
@@ -55,12 +58,14 @@ import { AtipayCoin } from '@/components/ui/AtipayCoin';
 const Commissions: React.FC = () => {
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
   const [history, setHistory] = useState<{ history: { [key: string]: { total: number; comisiones: UnwithdrawnCommission[] } } } | null>(null);
+  const [commissionHistory, setCommissionHistory] = useState<CommissionHistoryItem[]>([]);
   const [userPoints, setUserPoints] = useState<number>(0);
   const [loading, setLoading] = useState({
     summary: true,
     history: true,
     profile: true,
-    withdrawing: false
+    withdrawing: false,
+    commissionHistory: true
   });
   const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistoryItem[]>([]);
   const [loadingWithdrawalHistory, setLoadingWithdrawalHistory] = useState(true);
@@ -70,7 +75,8 @@ const Commissions: React.FC = () => {
     summary: '',
     history: '',
     profile: '',
-    withdraw: ''
+    withdraw: '',
+    commissionHistory: ''
   });
 
   const fetchWithdrawalHistory = async () => {
@@ -78,66 +84,8 @@ const Commissions: React.FC = () => {
       setLoadingWithdrawalHistory(true);
       setWithdrawalHistoryError('');
       
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No se encontró el token de autenticación');
-      }
-
-      const response = await fetch('https://127.0.0.1:8000/api/commissions/withdrawals/history', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const responseData = await response.json() as ApiWithdrawalResponse;
-      
-      if (!response.ok) {
-        const errorMessage = responseData?.message || 'Error al cargar el historial de retiros';
-        throw new Error(errorMessage);
-      }
-
-      if (!responseData || typeof responseData !== 'object') {
-        throw new Error('Formato de respuesta inválido');
-      }
-
-      if (!responseData.success) {
-        throw new Error(responseData.message || 'Error en la respuesta del servidor');
-      }
-
-      if (!responseData.history || !Array.isArray(responseData.history)) {
-        setWithdrawalHistory([]);
-        return;
-      }
-
-      // Validate and transform the data
-      const validatedHistory = responseData.history
-        .filter((item): item is ApiWithdrawalItem => 
-          item !== null &&
-          typeof item === 'object' &&
-          'id' in item &&
-          'amount' in item &&
-          'month' in item &&
-          'year' in item &&
-          'withdrawn_at' in item &&
-          typeof item.id === 'number' && 
-          typeof item.amount === 'string' &&
-          typeof item.month === 'number' &&
-          typeof item.year === 'number' &&
-          typeof item.withdrawn_at === 'string'
-        )
-        .map((item) => ({
-          id: item.id,
-          user_id: item.user_id,
-          amount: item.amount,
-          month: item.month,
-          year: item.year,
-          withdrawn_at: item.withdrawn_at
-        }));
-
-      setWithdrawalHistory(validatedHistory);
+      const historyData = await getWithdrawalHistory();
+      setWithdrawalHistory(historyData);
     } catch (error) {
       console.error('Error fetching withdrawal history:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido al cargar el historial';
@@ -151,7 +99,28 @@ const Commissions: React.FC = () => {
   useEffect(() => {
     fetchData();
     fetchWithdrawalHistory();
+    fetchCommissionHistory();
   }, []);
+
+  const fetchCommissionHistory = async () => {
+    try {
+      setLoading(prev => ({ ...prev, commissionHistory: true }));
+      const historyData = await getCommissionHistory();
+      setCommissionHistory(historyData);
+      setError(prev => ({ ...prev, commissionHistory: '' }));
+    } catch (err: unknown) {
+      const error = err as { errorData?: { message?: string } };
+      const message = error.errorData?.message || 'Error al cargar el historial de comisiones';
+      setError(prev => ({ ...prev, commissionHistory: message }));
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: message,
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, commissionHistory: false }));
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -203,7 +172,7 @@ const Commissions: React.FC = () => {
       setSummary(summaryRes);
       setHistory(historyRes);
       setUserPoints(Number(profileRes.accumulated_points) || 0);
-      setError({ summary: '', history: '', profile: '', withdraw: '' });
+      setError({ summary: '', history: '', profile: '', withdraw: '', commissionHistory: '' });
     } catch (err: unknown) {
       const error = err as { errorData?: { message?: string }, response?: { url?: string } };
       const message = error.errorData?.message || 'Error al cargar los datos';
@@ -250,6 +219,7 @@ const Commissions: React.FC = () => {
           description: `¡Has retirado $${result.amount} con éxito!`,
         });
         fetchData(); // Refresh data
+        fetchCommissionHistory(); 
       } else {
         toast({
           variant: 'destructive',
@@ -396,115 +366,117 @@ const Commissions: React.FC = () => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            Historial de Comisiones y Retiros
+            Historial Detallado de Comisiones
           </h2>
+          <p className="text-sm text-gray-500 mt-1">Visualiza todas tus comisiones con su estado actual</p>
         </div>
 
-        {loading.history ? (
+        {loading.commissionHistory ? (
           <div className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
           </div>
-        ) : error.history ? (
+        ) : error.commissionHistory ? (
           <div className="p-6 text-center">
             <div className="text-red-500 bg-red-50 p-4 rounded-lg inline-flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              {error.history}
+              {error.commissionHistory}
             </div>
           </div>
-        ) : (!history?.history || Object.keys(history.history).length === 0) ? (
+        ) : commissionHistory.length === 0 ? (
           <div className="p-8 text-center">
             <div className="inline-flex flex-col items-center justify-center p-6 rounded-xl bg-gray-50 max-w-md">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-700 mb-1">No hay registros</h3>
-              <p className="text-gray-500 text-sm">No se encontraron comisiones no retiradas</p>
+              <h3 className="text-lg font-medium text-gray-700 mb-1">No hay comisiones</h3>
+              <p className="text-gray-500 text-sm">Aún no has generado comisiones</p>
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-white rounded-lg shadow">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="w-48 px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
-                  <th className="w-24 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Nivel
                   </th>
-                  <th className="w-32 px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Monto
                   </th>
-                  <th className="w-32 px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Puntos
                   </th>
-                  <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Origen
                   </th>
-                  <th className="w-32 px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {Object.entries(history?.history || {}).flatMap(([, monthData]) => {
-                  return (monthData as { total: number; comisiones: UnwithdrawnCommission[] }).comisiones.map((comision: UnwithdrawnCommission) => (
-                    <tr key={comision.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0 h-6 w-6 bg-green-50 rounded-full flex items-center justify-center text-green-600 border border-green-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {new Date(comision.year, comision.month - 1, 1).toLocaleString('es-ES', { month: 'short', year: 'numeric' })}
-                          </span>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {commissionHistory.map((commission) => (
+                  <tr key={commission.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0 h-8 w-8 bg-green-50 rounded-full flex items-center justify-center text-green-600 border border-green-100">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
                         </div>
-                      </td>
-                      <td className="px-2 py-3 whitespace-nowrap">
-                        <div className="flex justify-center">
-                          <span className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded">
-                            Nv. {comision.level}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <span className="text-sm font-medium text-gray-900">
-                            {parseFloat(comision.commission_amount).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                          <AtipayCoin size="xs" className="text-yellow-500" />
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap text-right">
-                        <div className="pr-2">
-                          <span className="text-sm text-gray-600">
-                            {comision.points_generated.toLocaleString('es-ES')} pts
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-sm text-gray-600 capitalize">
-                          {comision.source_type === 'purchase' ? 'Compra' : comision.source_type}
+                        <span className="text-sm text-gray-900">{commission.fecha}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex justify-center">
+                        <span className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
+                          {commission.nivel}
                         </span>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <div className="flex justify-center">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            comision.withdrawn 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {comision.withdrawn ? 'Retirado' : 'Pendiente'}
-                          </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {commission.monto.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <AtipayCoin size="xs" className="text-yellow-500" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span className="text-sm text-gray-600">
+                        {commission.puntos_generados.toLocaleString('es-ES')} pts
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-6 w-6 bg-purple-50 rounded-full flex items-center justify-center mr-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
                         </div>
-                      </td>
-                    </tr>
-                  ));
-                })}
+                        <span className="text-sm text-gray-700">{commission.origen}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex justify-center">
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                          commission.estado === 'Procesado' 
+                            ? 'bg-green-100 text-green-800' 
+                            : commission.estado === 'Bloqueado (Faltan Puntos)'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {commission.estado}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
