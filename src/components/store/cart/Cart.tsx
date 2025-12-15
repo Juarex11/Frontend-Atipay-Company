@@ -41,6 +41,17 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
   const [depositData, setDepositData] = useState<DepositInfoData | null>(null);
   const [loadingBankInfo, setLoadingBankInfo] = useState(false);
 
+  // --- LÓGICA DE PUNTOS (RF-07) ---
+  const getCartPointsEarned = () => {
+    return cart.reduce((totalPoints, item) => {
+      const itemPoints = item.pointsEarned ? item.pointsEarned : 0;
+      return totalPoints + itemPoints * item.quantity;
+    }, 0);
+  }
+
+  const totalPointsEarned = getCartPointsEarned();
+  
+  // --- LÓGICA DE BANCO DINÁMICA (Del Main) ---
   useEffect(() => {
     if (paymentMethod === 'deposit') {
       const fetchBankInfo = async () => {
@@ -48,8 +59,7 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
         try {
           const response = await DepositService.getBankInfo();
           
-          // --- AQUÍ ESTÁ LA CORRECCIÓN DE LOS ERRORES ROJOS ---
-          // Usamos ': any' para que TypeScript no se queje
+          // Manejo seguro de la respuesta de la API
           let dataToUse: any = response;
           
           if (response && response.data) {
@@ -59,20 +69,20 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
           // Verificamos si es string (fallback) o objeto
           if (typeof dataToUse === 'string') {
              setDepositData({
-                bankInfo: dataToUse,
-                bankDescription: "Cuenta para depósitos",
-                adminName: "Milenco Carhuamaca",
-                adminPhone: "906289965",
-                adminEmail: "milencogicglobal@gmail.com"
+               bankInfo: dataToUse,
+               bankDescription: "Cuenta para depósitos",
+               adminName: "Milenco Carhuamaca",
+               adminPhone: "906289965",
+               adminEmail: "milencogicglobal@gmail.com"
              });
           } else {
              // Asignación segura
              setDepositData({
-                bankInfo: dataToUse.bank_info || "No hay información configurada.",
-                bankDescription: dataToUse.bank_description || "Información de Pago",
-                adminName: dataToUse.admin_name || "Administrador",
-                adminPhone: dataToUse.admin_phone || "No disponible",
-                adminEmail: dataToUse.admin_email || ""
+               bankInfo: dataToUse.bank_info || "No hay información configurada.",
+               bankDescription: dataToUse.bank_description || "Información de Pago",
+               adminName: dataToUse.admin_name || "Administrador",
+               adminPhone: dataToUse.admin_phone || "No disponible",
+               adminEmail: dataToUse.admin_email || ""
              });
           }
 
@@ -180,6 +190,19 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                           <AtipayCoin size="xs" />
                           <span className="text-green-700">{formatCurrency(item.price)} unidad</span>
                         </div>
+
+                        {/* --- Puntos Ganados por Producto (RF-07) --- */}
+                        {item.pointsEarned && item.pointsEarned > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-yellow-600">
+                            <svg className="w-3.5 h-3.5 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
+                            </svg>
+                            <span className="font-semibold text-yellow-700">
+                              Ganas: {item.pointsEarned * item.quantity} Puntos
+                            </span>
+                          </div>
+                        )}
+
                         <div className="mt-2 flex items-center gap-2">
                           <Button variant="outline" size="icon" className="h-8 w-8 border-green-200 hover:bg-green-50 text-green-700" onClick={() => handleQuantityChange(item.id, -1)}>
                             <Minus className="h-4 w-4" />
@@ -206,6 +229,23 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                       <span className="font-bold text-xl text-green-700">{formatCurrency(getCartTotal())}</span>
                     </div>
                   </div>
+
+                  {/* --- Resumen de Puntos Ganados (RF-07) --- */}
+                  {totalPointsEarned > 0 && (
+                    <div className="flex justify-between items-center py-2 border-t border-green-200/50">
+                      <span className="text-green-800 font-medium flex items-center gap-1">
+                        Puntos que ganarás
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-5 h-5 text-yellow-600 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
+                        </svg>
+                        <span className="font-bold text-xl text-yellow-700">
+                          {totalPointsEarned.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="mt-4 space-y-3">
                     <p className="text-sm font-medium text-green-800">Método de pago</p>
@@ -272,7 +312,7 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                                         </a>
                                         {depositData?.adminEmail && (
                                              <span className="text-[11px] text-gray-400 flex items-center gap-1 truncate max-w-[140px]" title={depositData.adminEmail}>
-                                                <Mail className="w-3 h-3" /> {depositData.adminEmail}
+                                                 <Mail className="w-3 h-3" /> {depositData.adminEmail}
                                              </span>
                                         )}
                                     </div>
