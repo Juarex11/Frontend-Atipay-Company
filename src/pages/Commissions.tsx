@@ -6,6 +6,9 @@ import {
   getCommissionHistory,
   getWithdrawalHistory,
 } from '../services/commissionService';
+import { getUserProfile } from '@/services/userService';
+import { toast } from '@/components/ui/use-toast';
+import { AtipayCoin } from '@/components/ui/AtipayCoin';
 import type { CommissionHistoryItem } from '../types/commission';
 interface UnwithdrawnCommission {
   id: number;
@@ -51,9 +54,6 @@ interface ApiWithdrawalResponse {
   message?: string;
   history?: ApiWithdrawalItem[];
 }
-import { getUserProfile } from '@/services/userService';
-import { toast } from '@/components/ui/use-toast';
-import { AtipayCoin } from '@/components/ui/AtipayCoin';
 
 const Commissions: React.FC = () => {
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
