@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config';
+import type {CommissionHistoryItem, CommissionHistoryResponse, WithdrawalHistoryItem, WithdrawalHistoryResponse} from '../types/commission';
 
 export interface TransactionHistoryItem {
   id: number;
@@ -272,4 +273,36 @@ export const getMinPointsRequired = async (): Promise<number> => {
     console.error("Error de red obteniendo puntos mínimos:", error);
     return 0;
   }
+};
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+};
+
+// historial de comisiones 
+export const getCommissionHistory = async (): Promise<CommissionHistoryItem[]> => {
+  const response = await fetch(`${API_BASE_URL}/affiliate/commission-history`, {
+    headers: getAuthHeaders(),
+  });
+  
+  const result = await handleResponse<CommissionHistoryResponse>(response);
+  return result.data;
+};
+
+// historial de retiros
+export const getWithdrawalHistory = async (): Promise<WithdrawalHistoryItem[]> => {
+  const response = await fetch(`${API_BASE_URL}/commissions/withdrawals/history`, {
+    headers: getAuthHeaders(),
+  });
+  
+  const result = await handleResponse<WithdrawalHistoryResponse>(response);
+  if (!result.success || !result.history) {
+    return [];
+  }
+  return result.history;
 };
