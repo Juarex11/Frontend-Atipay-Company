@@ -160,4 +160,40 @@ export const giftService = {
 
     return await response.json().catch(() => ({}));
   },
-};
+  // ... (todo tu código anterior: getGifts, createGift, updateGift, deleteGift)
+
+  // NUEVO: Obtener historial de solicitudes del usuario logueado
+  async getMyRequests() {
+    const response = await fetch(`${API_BASE_URL}/rewards/my-requests`, {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error('Error al cargar el historial de recompensas');
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  },
+
+  // NUEVO: Solicitar un canje
+  async requestRedemption(giftId: number, userId: number) {
+    const response = await fetch(`${API_BASE_URL}/rewards/${giftId}/redeem`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json', // Aquí sí es JSON, no FormData
+      },
+      body: JSON.stringify({ user_id: userId })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Error al solicitar el canje');
+    }
+
+    return data;
+  }
+}; // Cierre del objeto giftService
+

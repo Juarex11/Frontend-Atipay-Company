@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useMemo } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Loader2,
   ShoppingBag,
@@ -9,43 +9,66 @@ import {
   UploadCloud,
   Search,
   ExternalLink,
-  Clock
-} from 'lucide-react';
-import { productService } from '@/services/productService';
-import type { PurchaseRequest } from '@/services/productService';
-import { UploadProof } from '@/components/UploadProof';
-import ProofViewer from '@/components/ProofViewer';
-import { motion } from 'framer-motion';
+  Clock,
+} from "lucide-react";
+import { productService } from "@/services/productService";
+import type { PurchaseRequest } from "@/services/productService";
+import { UploadProof } from "@/components/UploadProof";
+import ProofViewer from "@/components/ProofViewer";
+import { motion } from "framer-motion";
 
 /* ===========================
    Helpers: badges y utilidades
    =========================== */
 
-const STATUS_BADGE_BASE = 'px-2 py-[2px] rounded-full text-[11px] font-semibold';
+const STATUS_BADGE_BASE =
+  "px-2 py-[2px] rounded-full text-[11px] font-semibold";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'approved':
-      return <span className={`${STATUS_BADGE_BASE} bg-green-100 text-green-700`}>Aprobada</span>;
-    case 'rejected':
-      return <span className={`${STATUS_BADGE_BASE} bg-red-100 text-red-700`}>Rechazada</span>;
+    case "approved":
+      return (
+        <span className={`${STATUS_BADGE_BASE} bg-green-100 text-green-700`}>
+          Aprobada
+        </span>
+      );
+    case "rejected":
+      return (
+        <span className={`${STATUS_BADGE_BASE} bg-red-100 text-red-700`}>
+          Rechazada
+        </span>
+      );
     default:
-      return <span className={`${STATUS_BADGE_BASE} bg-yellow-100 text-yellow-700`}>Pendiente</span>;
+      return (
+        <span className={`${STATUS_BADGE_BASE} bg-yellow-100 text-yellow-700`}>
+          Pendiente
+        </span>
+      );
   }
 };
 
 const getDepositStatusBadge = (status?: string | null) => {
   if (!status) return null;
-  const base = 'px-2 py-[2px] rounded-full text-[10px] font-semibold';
+  const base = "px-2 py-[2px] rounded-full text-[10px] font-semibold";
   switch (status) {
-    case 'approved':
-      return <span className={`${base} bg-green-100 text-green-700`}>✓ Comprobante aprobado</span>;
-    case 'rejected':
-      return <span className={`${base} bg-red-100 text-red-700`}>✗ Comprobante rechazado</span>;
-    case 'expired':
-      return <span className={`${base} bg-gray-100 text-gray-700`}>⏰ Comprobante expirado</span>;
-    case 'pending':
-      return <span className={`${base} bg-blue-100 text-blue-700`}>⏳ En revisión</span>;
+    case "approved":
+      return (
+        <span className={`${base} bg-green-100 text-green-700`}>
+          ✓ Comprobante aprobado
+        </span>
+      );
+    case "rejected":
+      return (
+        <span className={`${base} bg-red-100 text-red-700`}>
+          ✗ Comprobante rechazado
+        </span>
+      );
+    case "expired":
+      return (
+        <span className={`${base} bg-gray-100 text-gray-700`}>
+          ⏰ Comprobante expirado
+        </span>
+      );
     default:
       return null;
   }
@@ -61,12 +84,13 @@ const PurchaseHistory: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // UI state
-  const [currentTab, setCurrentTab] = useState<string>('all');
-  const [search, setSearch] = useState<string>('');
-  const [paymentFilter, setPaymentFilter] = useState<string>(''); // '' | 'deposit' | 'atipay'
+  const [currentTab, setCurrentTab] = useState<string>("all");
+  const [search, setSearch] = useState<string>("");
+  const [paymentFilter, setPaymentFilter] = useState<string>(""); // '' | 'deposit' | 'atipay'
 
   // Modals
-  const [selectedForUpload, setSelectedForUpload] = useState<PurchaseRequest | null>(null);
+  const [selectedForUpload, setSelectedForUpload] =
+    useState<PurchaseRequest | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerData, setViewerData] = useState<{
     src: string | null;
@@ -76,17 +100,17 @@ const PurchaseHistory: React.FC = () => {
     status?: string;
   } | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
   // Construye URL absoluta y corrige localhost -> 127.0.0.1:8000
   function makeFullUrl(path?: string | null) {
     if (!path) return null;
-    if (path.includes('localhost')) {
-      return path.replace('localhost', '127.0.0.1:8000');
+    if (path.includes("localhost")) {
+      return path.replace("localhost", "127.0.0.1:8000");
     }
-    if (path.startsWith('http')) return path;
-    const clean = path.startsWith('/') ? path : `/${path}`;
-    if (clean.startsWith('/storage')) return `${API_BASE}${clean}`;
+    if (path.startsWith("http")) return path;
+    const clean = path.startsWith("/") ? path : `/${path}`;
+    if (clean.startsWith("/storage")) return `${API_BASE}${clean}`;
     return `${API_BASE}/storage${clean}`;
   }
 
@@ -112,8 +136,10 @@ const PurchaseHistory: React.FC = () => {
         setPurchases(data || []);
         setError(null);
       } catch (err) {
-        console.error('Error cargando historial:', err);
-        setError('No se pudo cargar el historial de compras. Intenta más tarde.');
+        console.error("Error cargando historial:", err);
+        setError(
+          "No se pudo cargar el historial de compras. Intenta más tarde."
+        );
       } finally {
         setIsLoading(false);
       }
@@ -122,19 +148,26 @@ const PurchaseHistory: React.FC = () => {
   }, []);
 
   // Contadores por pestaña
-  const counts = useMemo(() => ({
-    all: purchases.length,
-    pending: purchases.filter(p => p.status === 'pending').length,
-    approved: purchases.filter(p => p.status === 'approved').length,
-    rejected: purchases.filter(p => p.status === 'rejected').length,
-  }), [purchases]);
+  const counts = useMemo(
+    () => ({
+      all: purchases.length,
+      pending: purchases.filter((p) => p.status === "pending").length,
+      approved: purchases.filter((p) => p.status === "approved").length,
+      rejected: purchases.filter((p) => p.status === "rejected").length,
+    }),
+    [purchases]
+  );
 
   // Filtrado (tabs + search + método)
   const filteredPurchases = useMemo(() => {
     return purchases
-      .filter(p => (currentTab === 'all' ? true : p.status === currentTab))
-      .filter(p => p.product.name.toLowerCase().includes(search.toLowerCase()))
-      .filter(p => paymentFilter ? p.payment_method === paymentFilter : true);
+      .filter((p) => (currentTab === "all" ? true : p.status === currentTab))
+      .filter((p) =>
+        p.product.name.toLowerCase().includes(search.toLowerCase())
+      )
+      .filter((p) =>
+        paymentFilter ? p.payment_method === paymentFilter : true
+      );
   }, [purchases, currentTab, search, paymentFilter]);
 
   // Estados UI: loading / error / vacío
@@ -142,7 +175,9 @@ const PurchaseHistory: React.FC = () => {
     return (
       <div className="flex flex-col items-center py-16">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="mt-3 text-gray-600 text-sm">Cargando historial de compras...</p>
+        <p className="mt-3 text-gray-600 text-sm">
+          Cargando historial de compras...
+        </p>
       </div>
     );
   }
@@ -152,7 +187,9 @@ const PurchaseHistory: React.FC = () => {
       <div className="text-center py-16">
         <h3 className="text-lg font-semibold text-red-600">Error</h3>
         <p className="text-gray-600 mt-2">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">Reintentar</Button>
+        <Button onClick={() => window.location.reload()} className="mt-4">
+          Reintentar
+        </Button>
       </div>
     );
   }
@@ -163,8 +200,12 @@ const PurchaseHistory: React.FC = () => {
         <div className="mx-auto h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
           <ShoppingBag className="h-12 w-12 text-gray-400" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-800">No tienes compras aún</h3>
-        <p className="text-gray-600 mt-1">Explora nuestros productos y realiza tu primera compra.</p>
+        <h3 className="text-lg font-semibold text-gray-800">
+          No tienes compras aún
+        </h3>
+        <p className="text-gray-600 mt-1">
+          Explora nuestros productos y realiza tu primera compra.
+        </p>
       </div>
     );
   }
@@ -174,7 +215,6 @@ const PurchaseHistory: React.FC = () => {
      =========================== */
   return (
     <div className="space-y-6">
-
       {/* Modales */}
       {selectedForUpload && (
         <UploadProof
@@ -187,19 +227,27 @@ const PurchaseHistory: React.FC = () => {
               const data = await productService.getMyPurchaseHistory();
               setPurchases(data || []);
             } catch (err) {
-              console.error('Error recargando compras:', err);
+              console.error("Error recargando compras:", err);
             }
           }}
         />
       )}
 
-      <ProofViewer open={viewerOpen} onClose={() => setViewerOpen(false)} data={viewerData} />
+      <ProofViewer
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        data={viewerData}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Historial de Compras</h2>
-          <p className="text-sm text-gray-500 mt-1">Administra tus comprobantes y el estado de tus compras</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Historial de Compras
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Administra tus comprobantes y el estado de tus compras
+          </p>
         </div>
       </div>
 
@@ -207,7 +255,7 @@ const PurchaseHistory: React.FC = () => {
       <div className="flex flex-wrap items-center gap-3 p-4 border rounded-lg bg-white/60 shadow-sm">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />   
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <input
             type="text"
             placeholder="Buscar producto..."
@@ -242,9 +290,15 @@ const PurchaseHistory: React.FC = () => {
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
         <TabsList className="flex flex-wrap gap-2">
           <TabsTrigger value="all">Todas ({counts.all})</TabsTrigger>
-          <TabsTrigger value="pending">Pendientes ({counts.pending})</TabsTrigger>
-          <TabsTrigger value="approved">Aprobadas ({counts.approved})</TabsTrigger>
-          <TabsTrigger value="rejected">Rechazadas ({counts.rejected})</TabsTrigger>
+          <TabsTrigger value="pending">
+            Pendientes ({counts.pending})
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Aprobadas ({counts.approved})
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rechazadas ({counts.rejected})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={currentTab} className="mt-6">
@@ -260,25 +314,37 @@ const PurchaseHistory: React.FC = () => {
                   {/* Visual status border */}
                   <div
                     className={`absolute left-0 top-0 bottom-0 w-[4px] ${
-                      purchase.status === 'approved' ? 'bg-green-500' :
-                      purchase.status === 'rejected' ? 'bg-red-500' : 'bg-yellow-400'
+                      purchase.status === "approved"
+                        ? "bg-green-500"
+                        : purchase.status === "rejected"
+                          ? "bg-red-500"
+                          : "bg-yellow-400"
                     }`}
                   />
 
                   <CardHeader className="bg-gray-50 border-b pl-6">
                     <CardTitle className="flex justify-between items-start gap-2">
                       <div className="pr-2 w-3/4">
-                        <span className="text-sm font-semibold block truncate">{purchase.product.name}</span>
+                        <span className="text-sm font-semibold block truncate">
+                          {purchase.product.name}
+                        </span>
                         <div className="mt-1 flex gap-2 flex-wrap">
+                          {/* Badge principal (Aprobada/Pendiente/Rechazada) */}
                           {getStatusBadge(purchase.status)}
-                          {purchase.payment_method === 'deposit' && purchase.deposit_status && getDepositStatusBadge(purchase.deposit_status)}
+
+                          {/* CORRECCIÓN: Solo mostramos el estado del depósito si la compra sigue PENDIENTE */}
+                          {purchase.payment_method === "deposit" &&
+                            purchase.deposit_status &&
+                            purchase.status === "pending" &&
+                            getDepositStatusBadge(purchase.deposit_status)}
                         </div>
                       </div>
 
                       <div className="text-right w-1/4">
-                        {/* small date */}
                         <div className="text-xs text-gray-400">
-                          {purchase.created_at ? new Date(purchase.created_at).toLocaleDateString() : ''}
+                          {purchase.created_at
+                            ? new Date(purchase.created_at).toLocaleDateString()
+                            : ""}
                         </div>
                       </div>
                     </CardTitle>
@@ -302,34 +368,53 @@ const PurchaseHistory: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         {/* Metodo de pago (map a texto bonito) */}
                         <p className="text-xs text-gray-600">
-                          Método de pago:{' '}
+                          Método de pago:{" "}
                           <span className="font-medium text-gray-800">
-                            {purchase.payment_method === 'deposit' ? 'Depósito Bancario' : purchase.payment_method === 'atipay' ? 'Pago con Atipay' : purchase.payment_method}
+                            {purchase.payment_method === "deposit"
+                              ? "Depósito Bancario"
+                              : purchase.payment_method === "atipay"
+                                ? "Pago con Atipay"
+                                : purchase.payment_method}
                           </span>
                         </p>
 
                         {/* Puntos ya no se muestra (no existe) */}
 
                         {/* Sección deposit / comprobante */}
-                        {purchase.payment_method === 'deposit' && (
+                        {purchase.payment_method === "deposit" && (
                           <div className="mt-3">
                             {!purchase.deposit_proof_path ? (
-                              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-xs text-yellow-800 font-semibold">⚠ Comprobante pendiente</p>
-                                <p className="text-xs text-yellow-700 mt-1">Sube una foto clara del voucher. Asegúrate que se vea el monto, la fecha y el número de operación.</p>
-                                <div className="mt-3">
-                                  <Button
-                                    onClick={() => setSelectedForUpload(purchase)}
-                                    className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-xs flex items-center gap-2"
-                                  >
+                              // --- NUEVO DISEÑO PEGAR AQUÍ ---
+                              <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <div className="flex items-start gap-3">
+                                  <div className="bg-orange-100 p-2 rounded-full text-orange-600 shrink-0">
                                     <UploadCloud className="w-4 h-4" />
-                                    Subir comprobante
-                                  </Button>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-gray-800">
+                                      Falta el comprobante
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 leading-tight mt-0.5">
+                                      Sube la foto para procesar tu pedido.
+                                    </p>
+                                  </div>
                                 </div>
+
+                                <Button
+                                  onClick={() => setSelectedForUpload(purchase)}
+                                  size="sm"
+                                  className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white text-xs h-8 shadow-sm transition-all"
+                                >
+                                  Subir ahora
+                                </Button>
                               </div>
                             ) : (
+                              // -----------------------------
+                              // MANTENER ESTO IGUAL (El bloque verde de "Comprobante subido")
                               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                                <p className="text-xs text-green-700 font-semibold">✓ Comprobante subido</p>
+                                <p className="text-xs text-green-700 font-semibold">
+                                  ✓ Comprobante subido
+                                </p>
                                 <div className="mt-2 flex items-center justify-center gap-3">
                                   <button
                                     onClick={() => openProof(purchase)}
@@ -338,9 +423,12 @@ const PurchaseHistory: React.FC = () => {
                                     <ExternalLink className="w-3 h-3" />
                                     Ver comprobante
                                   </button>
-                                  {/* descarga directa (si quieres habilitar) */}
                                   <a
-                                    href={makeFullUrl(purchase.deposit_proof_path) || undefined}
+                                    href={
+                                      makeFullUrl(
+                                        purchase.deposit_proof_path
+                                      ) || undefined
+                                    }
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-xs text-gray-600 hover:underline"
@@ -354,11 +442,15 @@ const PurchaseHistory: React.FC = () => {
                         )}
 
                         {/* Método atipay (informativo) */}
-                        {purchase.payment_method === 'atipay' && (
+                        {purchase.payment_method === "atipay" && (
                           <div className="mt-3">
                             <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg">
-                              <p className="text-xs text-blue-700 font-semibold">Pago con Atipay</p>
-                              <p className="text-xs text-gray-600 mt-1">El pago se procesó mediante Atipay.</p>
+                              <p className="text-xs text-blue-700 font-semibold">
+                                Pago con Atipay
+                              </p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                El pago se procesó mediante Atipay.
+                              </p>
                             </div>
                           </div>
                         )}
@@ -367,7 +459,10 @@ const PurchaseHistory: React.FC = () => {
                         {purchase.admin_message && (
                           <div className="mt-3 p-2 bg-gray-50 rounded-md border">
                             <p className="text-xs text-gray-700">
-                              <span className="font-semibold">Mensaje del administrador:</span> {purchase.admin_message}
+                              <span className="font-semibold">
+                                Mensaje del administrador:
+                              </span>{" "}
+                              {purchase.admin_message}
                             </p>
                           </div>
                         )}

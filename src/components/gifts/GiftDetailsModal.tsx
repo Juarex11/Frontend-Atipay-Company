@@ -4,8 +4,9 @@ import { Clock, CheckCircle, XCircle, Gift } from 'lucide-react';
 import { useState } from 'react';
 
 interface RequestStatus {
-  status?: 'pending' | 'approved' | 'rejected';
+  status?: 'pending' | 'approved' | 'rejected' | 'claimed';
   message?: string;
+  requestId?: number;
 }
 
 interface GiftDetailsModalProps {
@@ -14,7 +15,7 @@ interface GiftDetailsModalProps {
   onRedeem?: () => Promise<void>;
   requestStatus?: RequestStatus | null;
   gift: {
-    id: number;
+    id: string;
     name: string;
     description: string;
     redeem_points: number;
@@ -63,6 +64,13 @@ export function GiftDetailsModal({
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
             <CheckCircle className="w-4 h-4 mr-1" />
             Aprobado
+          </span>
+        );
+      case 'claimed':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            <Gift className="w-4 h-4 mr-1" />
+            Reclamado
           </span>
         );
       case 'rejected':

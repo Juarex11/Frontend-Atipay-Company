@@ -7,6 +7,7 @@ export interface GiftFormData {
   description: string;
   redeem_points: number;
   stock: number;
+  max_redeem: number;
   reward_image?: File | null;
   image_url?: string;
 }
@@ -31,6 +32,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
     description: '',
     redeem_points: 0,
     stock: 0,
+    max_redeem: 1,
     image_url: '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -44,6 +46,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
         description: initialData.description || '',
         redeem_points: initialData.redeem_points || 0,
         stock: initialData.stock || 0,
+        max_redeem: initialData.max_redeem || 1,
         image_url: initialData.image_url || '',
       });
       setImageRemoved(false); // Reset image removed state
@@ -54,6 +57,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
         description: '',
         redeem_points: 0,
         stock: 0,
+        max_redeem: 1,
         image_url: '',
       });
       setImageRemoved(false);
@@ -62,14 +66,17 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
 
   const [pointsValue, setPointsValue] = useState<string>('');
   const [stockValue, setStockValue] = useState<string>('');
+  const [maxRedeemValue, setMaxRedeemValue] = useState<string>('');
 
   useEffect(() => {
     if (initialData) {
       setPointsValue(initialData.redeem_points?.toString() || '');
       setStockValue(initialData.stock?.toString() || '');
+      setMaxRedeemValue(initialData.max_redeem?.toString() || '');
     } else {
       setPointsValue('');
       setStockValue('');
+      setMaxRedeemValue('');
     }
   }, [initialData, isOpen]);
 
@@ -85,16 +92,12 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
       }));
     } else if (name === 'stock') {
       setStockValue(value);
-      // Actualizar formData con el valor numérico o 0 si está vacío
-      setFormData(prev => ({
-        ...prev,
-        [name]: value === '' ? 0 : Number(value)
-      }));
+      setFormData(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
+    } else if (name === 'max_redeem') {
+      setMaxRedeemValue(value);
+      setFormData(prev => ({ ...prev, [name]: value === '' ? 1 : Number(value) }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value,
-      }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -127,6 +130,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
     formDataToSend.append('description', formData.description);
     formDataToSend.append('redeem_points', redeemPointsValue.toString());
     formDataToSend.append('stock', stockValueToSend.toString());
+    formDataToSend.append('max_redeem', maxRedeemValue === '' ? '1' : maxRedeemValue);
 
     // Manejar la imagen
     if (selectedFile) {
@@ -201,7 +205,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Puntos *
@@ -230,6 +234,22 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
                 value={stockValue}
                 onChange={handleChange}
                 placeholder="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Límite de canjes *
+              </label>
+              <input
+                type="number"
+                name="max_redeem"
+                min="1"
+                value={maxRedeemValue}
+                onChange={handleChange}
+                placeholder="1"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
                 disabled={isSubmitting}
