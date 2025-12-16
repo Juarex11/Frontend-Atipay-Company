@@ -22,6 +22,7 @@ import {
   CreditCard,
   ArrowLeftRight,
   Activity,
+  Trophy,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -94,6 +95,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
         },
         { icon: HandCoins, label: "Mis Retiros", href: "/my-withdrawals" },
         { icon: HandCoins, label: "Mis Comisiones", href: "/commissions" },
+        { icon: Trophy, label: "Ranking de ventas", href: "/ranking" },
         { icon: Users, label: "Mi Equipo", href: "/my-affiliates" },
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
         { icon: Gift, label: "Catálogo de Regalos", href: "/gifts" },
