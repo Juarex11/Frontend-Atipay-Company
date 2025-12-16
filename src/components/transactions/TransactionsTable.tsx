@@ -178,6 +178,20 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
     setSelectedTransaction(transaction);
     setIsModalOpen(true);
   };
+  const getLocalStatusText = (status: string) => {
+    // Forzamos que 'pending' o 'earring' digan "Pendiente"
+    if (status === 'pending' || status === 'earring') return 'Pendiente';
+    // Para los demás (approved, rejected), usamos la función original
+    return getStatusText(status); 
+  };
+
+  const getLocalStatusColor = (status: string) => {
+    // Forzamos el color amarillo para pendientes
+    if (status === 'pending' || status === 'earring') {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100';
+    }
+    return getStatusColor(status);
+  };
   return (
     <>
       <Table>
@@ -237,8 +251,8 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getStatusColor(transaction.status)}>
-                    {getStatusText(transaction.status)}
+                  <Badge className={getLocalStatusColor(transaction.status)}>
+                    {getLocalStatusText(transaction.status)}
                   </Badge>
                 </TableCell>
                 <TableCell>

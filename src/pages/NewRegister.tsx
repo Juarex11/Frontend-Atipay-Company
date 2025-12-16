@@ -13,6 +13,7 @@ type FormData = {
   email: string;
   username: string;
   password: string;
+  passwordConfirmation: string;
   referralCode: string;
   phone: string;
 };
@@ -29,6 +30,7 @@ export default function NewRegister() {
     email: "",
     username: "",
     password: "",
+    passwordConfirmation: "",
     referralCode: searchParams.get("ref") || "",
     phone: "",
   });
@@ -62,6 +64,12 @@ export default function NewRegister() {
       return;
     }
 
+    // Validar contraseñas
+    if (formData.password !== formData.passwordConfirmation) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -69,7 +77,7 @@ export default function NewRegister() {
       requestBody.append('username', formData.username.trim());
       requestBody.append('email', formData.email.trim());
       requestBody.append('password', formData.password);
-      requestBody.append('password_confirmation', formData.password);
+      requestBody.append('password_confirmation', formData.passwordConfirmation);
       requestBody.append('reference_code', formData.referralCode.trim());
       requestBody.append('phone_number', formData.phone.trim());
 
@@ -287,6 +295,36 @@ export default function NewRegister() {
                         name="password"
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
+                        onChange={handleInputChange}
+                        placeholder="••••••••"
+                        className="h-12 pr-10 text-base"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* CAMPO DE CONFIRMACIÓN DE CONTRASEÑA */}
+                  <div className="space-y-2">
+                    <Label htmlFor="passwordConfirmation" className="text-sm font-medium text-green-700">
+                      Confirmar Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="passwordConfirmation"
+                        name="passwordConfirmation" // Importante: debe coincidir con el estado
+                        type={showPassword ? "text" : "password"}
+                        value={formData.passwordConfirmation}
                         onChange={handleInputChange}
                         placeholder="••••••••"
                         className="h-12 pr-10 text-base"
