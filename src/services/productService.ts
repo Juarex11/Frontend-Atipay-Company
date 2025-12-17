@@ -27,7 +27,10 @@ export interface PurchaseRequest {
   amount: number;
   points_used: number;
   created_at: string;
-  product: Product;
+  // FIX: Para soportar compras manuales, `product` puede ser opcional
+  product?: Product;
+  // FIX: Descripción opcional usada por compras manuales
+  description?: string;
   user?: {
     id: string;
     name: string;

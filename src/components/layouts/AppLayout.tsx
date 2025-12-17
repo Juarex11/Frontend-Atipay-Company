@@ -22,6 +22,7 @@ import {
   CreditCard,
   ArrowLeftRight,
   Activity,
+  ShoppingBag,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -78,6 +79,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
       ? [
         { icon: BarChart3, label: "Dashboard", href: "/admin" },
         { icon: Activity, label: "Inversiones Activas", href: "/admin/inversiones-activas" },
+        { icon: ShoppingBag, label: "Registrar Compra", href: "/admin/manual-purchase" },
         { icon: Users, label: "Usuarios", href: "/admin/users" },
         { icon: HandCoins, label: "Retiros", href: "/withdrawals" },
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
@@ -300,9 +302,8 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              {user.role === "admin" && (
-                <NotificationsDropdown />
-              )}
+              {/* FIX: Mostrar notificaciones para todos los usuarios autenticados */}
+              <NotificationsDropdown />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

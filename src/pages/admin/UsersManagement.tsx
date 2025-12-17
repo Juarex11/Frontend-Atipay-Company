@@ -435,15 +435,34 @@ const UsersManagement = () => {
     }
   }, [highlightedUserId, usersResponse?.items]);
 
-  // Scroll to highlighted row when it's available
+  // REFRESH: escuchar eventos para actualizar la lista de usuarios (ej. al registrar compra manual)
   useEffect(() => {
-    if (highlightedUserId && highlightedRowRef.current) {
-      highlightedRowRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-    }
-  }, [highlightedUserId, usersResponse?.items]);
+    const handleRefresh = (ev?: Event) => {
+      // Refetch users
+      refetch();
+
+      // Si viene detalle del evento, intentamos actualizar el modal si corresponde
+      try {
+        const custom = ev as CustomEvent | undefined;
+        const userId = custom?.detail?.userId;
+        if (userId && selectedUser?.id === Number(userId)) {
+          refetch().then(() => {
+            const updated = (usersResponse?.items || []).find(u => u.id === Number(userId));
+            if (updated) setSelectedUser(updated);
+          }).catch(() => {});
+        }
+      } catch (e) {
+        // noop
+      }
+    };
+
+    window.addEventListener('refresh:users', handleRefresh);
+    window.addEventListener('admin:purchase:registered', handleRefresh as EventListener);
+    return () => {
+      window.removeEventListener('refresh:users', handleRefresh);
+      window.removeEventListener('admin:purchase:registered', handleRefresh as EventListener);
+    };
+  }, [refetch, selectedUser, usersResponse?.items]);
 
   return (
     <div className="p-4 sm:p-6">

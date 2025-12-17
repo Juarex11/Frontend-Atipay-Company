@@ -157,7 +157,7 @@ export const UploadProof: React.FC<UploadProofProps> = ({ purchase, onClose, onS
             </div>
             <div>
               <p className="text-sm text-gray-700">Producto a pagar:</p>
-              <p className="text-sm font-bold text-blue-700">{purchase.product.name}</p>
+              <p className="text-sm font-bold text-blue-700">{purchase.product?.name || purchase.description || 'Compra sin nombre'}</p>
             </div>
           </div>
 

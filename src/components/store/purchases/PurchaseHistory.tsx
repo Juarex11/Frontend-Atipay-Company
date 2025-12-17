@@ -10,6 +10,7 @@ import {
   Search,
   ExternalLink,
   Clock,
+  Award,
 } from "lucide-react";
 import { productService } from "@/services/productService";
 import type { PurchaseRequest } from "@/services/productService";
@@ -120,7 +121,8 @@ const PurchaseHistory: React.FC = () => {
     setViewerData({
       src: url,
       id: purchase.id,
-      productName: purchase.product.name,
+      // CORRECCIÓN 1: Usar custom_description
+      productName: purchase.product?.name || (purchase as any).custom_description || 'Compra Manual',
       date: purchase.created_at,
       status: purchase.deposit_status || purchase.status,
     });
@@ -162,9 +164,11 @@ const PurchaseHistory: React.FC = () => {
   const filteredPurchases = useMemo(() => {
     return purchases
       .filter((p) => (currentTab === "all" ? true : p.status === currentTab))
-      .filter((p) =>
-        p.product.name.toLowerCase().includes(search.toLowerCase())
-      )
+      // CORRECCIÓN 2: Búsqueda también por custom_description
+      .filter((p) => {
+        const name = (p.product?.name || (p as any).custom_description || 'Compra Manual').toLowerCase();
+        return name.includes(search.toLowerCase());
+      })
       .filter((p) =>
         paymentFilter ? p.payment_method === paymentFilter : true
       );
@@ -325,15 +329,16 @@ const PurchaseHistory: React.FC = () => {
                   <CardHeader className="bg-gray-50 border-b pl-6">
                     <CardTitle className="flex justify-between items-start gap-2">
                       <div className="pr-2 w-3/4">
+                        {/* CORRECCIÓN 3: Título de la tarjeta */}
                         <span className="text-sm font-semibold block truncate">
-                          {purchase.product.name}
+                          {purchase.product?.name || (purchase as any).custom_description || 'Compra Manual'}
                         </span>
                         <div className="mt-1 flex gap-2 flex-wrap">
                           {/* Badge principal (Aprobada/Pendiente/Rechazada) */}
                           {getStatusBadge(purchase.status)}
 
-                          {/* CORRECCIÓN: Solo mostramos el estado del depósito si la compra sigue PENDIENTE */}
-                          {purchase.payment_method === "deposit" &&
+                          {/* Estado del depósito si aplica */}
+                          {(String(purchase.payment_method) === "deposit" || String(purchase.payment_method) === "deposito") &&
                             purchase.deposit_status &&
                             purchase.status === "pending" &&
                             getDepositStatusBadge(purchase.deposit_status)}
@@ -353,10 +358,11 @@ const PurchaseHistory: React.FC = () => {
                   <CardContent className="pt-4 pl-6 pr-6 pb-6">
                     <div className="flex items-start gap-4">
                       {/* imagen o placeholder */}
-                      {purchase.product.image_url ? (
+                      {purchase.product?.image_url ? (
                         <img
                           src={purchase.product.image_url}
-                          alt={purchase.product.name}
+                          // CORRECCIÓN 4: Alt de la imagen
+                          alt={purchase.product?.name || (purchase as any).custom_description || 'Compra Manual'}
                           className="h-16 w-16 object-cover rounded-md shadow-sm"
                         />
                       ) : (
@@ -366,25 +372,53 @@ const PurchaseHistory: React.FC = () => {
                       )}
 
                       <div className="flex-1 min-w-0">
-                        {/* Metodo de pago (map a texto bonito) */}
+                        {/* Metodo de pago */}
                         <p className="text-xs text-gray-600">
-                          Método de pago:{" "}
+                          Método de pago: {" "}
                           <span className="font-medium text-gray-800">
-                            {purchase.payment_method === "deposit"
-                              ? "Depósito Bancario"
-                              : purchase.payment_method === "atipay"
-                                ? "Pago con Atipay"
-                                : purchase.payment_method}
+                            {String(purchase.payment_method) === "deposit" || String(purchase.payment_method) === "deposito" ? "Depósito Bancario"
+                              : String(purchase.payment_method) === "atipay" ? "Pago con Atipay"
+                              : String(purchase.payment_method) === "atipay_balance" ? "Pagado con Saldo"
+                              : String(purchase.payment_method) === "manual_admin" ? "Registro Manual"
+                              : purchase.payment_method}
                           </span>
                         </p>
 
-                        {/* Puntos ya no se muestra (no existe) */}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {/* 1. Badge de Monto (Siempre visible si hay monto) */}
+                          {Number(purchase.amount) > 0 && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700">
+                              <span>Monto:</span>
+                              <span className="text-slate-900 font-bold">
+                                S/ {Number(purchase.amount).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* 2. Badge de Puntos Inteligente */}
+                          {(() => {
+                            // Lógica: Si la compra tiene puntos guardados, úsalos. 
+                            // Si no, usa los puntos del producto * cantidad (si existe producto)
+                            const points = Number(purchase.points_earned) > 0 
+                              ? Number(purchase.points_earned) 
+                              : (purchase.product?.points_earned ? Number(purchase.product.points_earned) * (purchase.quantity || 1) : 0);
+
+                            if (points > 0) {
+                              return (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-yellow-50 border border-yellow-200 text-xs font-bold text-yellow-700 shadow-sm">
+                                  <Award className="w-3.5 h-3.5" />
+                                  <span>+{points.toFixed(2)} pts</span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
 
                         {/* Sección deposit / comprobante */}
-                        {purchase.payment_method === "deposit" && (
+                        {(String(purchase.payment_method) === "deposit" || String(purchase.payment_method) === "deposito") && (
                           <div className="mt-3">
                             {!purchase.deposit_proof_path ? (
-                              // --- NUEVO DISEÑO PEGAR AQUÍ ---
                               <div className="mt-4 bg-gray-50 rounded-lg p-3 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <div className="flex items-start gap-3">
                                   <div className="bg-orange-100 p-2 rounded-full text-orange-600 shrink-0">
@@ -409,8 +443,6 @@ const PurchaseHistory: React.FC = () => {
                                 </Button>
                               </div>
                             ) : (
-                              // -----------------------------
-                              // MANTENER ESTO IGUAL (El bloque verde de "Comprobante subido")
                               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
                                 <p className="text-xs text-green-700 font-semibold">
                                   ✓ Comprobante subido
@@ -451,6 +483,24 @@ const PurchaseHistory: React.FC = () => {
                               <p className="text-xs text-gray-600 mt-1">
                                 El pago se procesó mediante Atipay.
                               </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Pagado con saldo */}
+                        {String(purchase.payment_method) === "atipay_balance" && (
+                          <div className="mt-3">
+                            <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg">
+                              <p className="text-xs text-blue-700 font-semibold">Pagado con Saldo</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Registro manual por admin */}
+                        {String(purchase.payment_method) === "manual_admin" && (
+                          <div className="mt-3">
+                            <div className="p-2 bg-gray-50 border border-gray-100 rounded-lg">
+                              <p className="text-xs text-gray-700 font-semibold">Registro Manual</p>
                             </div>
                           </div>
                         )}
