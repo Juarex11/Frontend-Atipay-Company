@@ -32,6 +32,7 @@ import CommissionsReportsPage from "./pages/admin/CommissionsReportsPage";
 import AffiliateNetwork from "./pages/admin/AffiliateNetwork";
 import AdminProfileSettings from "./pages/admin/AdminProfileSettings";
 import AdminPaymentMethods from "./pages/admin/AdminPaymentMethods";
+import SalesRanking from "./pages/SalesRanking";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -389,6 +390,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <Commissions />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/ranking"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SalesRanking />
             </AppLayout>
           </ProtectedRoute>
         }
