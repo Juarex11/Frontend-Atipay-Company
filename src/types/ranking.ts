@@ -4,6 +4,7 @@ export interface RankingUser {
   email: string;
   commission_amount: string;
   accumulated_points: number;
+  level: number;
 }
 
 export interface CurrentUserRanking {
@@ -28,4 +29,5 @@ export interface RankingTableProps {
   title: string;
   description: string;
   limit: number | null;
+  showLevel?: boolean;
 }

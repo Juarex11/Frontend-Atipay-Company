@@ -20,21 +20,24 @@ const SalesRanking: React.FC = () => {
       username: 'Danny Brayhan ',
       email: 'carlos.mendoza@example.com',
       commission_amount: '850.50',
-      accumulated_points: 142
+      accumulated_points: 142,
+      level: 2
     },
     {
       id: 102,
       username: 'María Rodríguez',
       email: 'maria.rodriguez@example.com',
       commission_amount: '620.30',
-      accumulated_points: 98
+      accumulated_points: 98,
+      level: 1
     },
     {
       id: 103,
       username: 'José Fernández',
       email: 'jose.fernandez@example.com',
       commission_amount: '450.00',
-      accumulated_points: 75
+      accumulated_points: 75,
+      level: 1
     },
   ]);
 
@@ -92,6 +95,7 @@ const SalesRanking: React.FC = () => {
             title="Top 10 Mejores Vendedores"
             description="Ranking de vendedores"
             limit={10}
+            showLevel={false}
           />
         </TabsContent>
 
@@ -105,6 +109,7 @@ const SalesRanking: React.FC = () => {
             title="Ranking de Mis Afiliados"
             description="Ranking del equipo de afiliados"
             limit={null}
+            showLevel={true}
           />
         </TabsContent>
       </Tabs>
@@ -120,7 +125,8 @@ const RankingTable: React.FC<RankingTableProps> = ({
   error,
   title,
   description,
-  limit
+  limit,
+  showLevel = false
 }) => {
   const displayedRanking = limit ? ranking.slice(0, limit) : ranking;
 
@@ -164,9 +170,10 @@ const RankingTable: React.FC<RankingTableProps> = ({
           <Table>
             <TableHeader className="bg-[#3EB363] text-white">
               <TableRow>
-                <TableHead className="text-white text-center w-50">Puesto</TableHead>
-                <TableHead className="text-white">Usuario</TableHead>
-                <TableHead className="text-white w-40">Puntos</TableHead>
+                <TableHead className="text-white text-center w-32">PUESTO</TableHead>
+                <TableHead className="text-white">USUARIO</TableHead>
+                {showLevel && <TableHead className="text-white text-center w-40">NIVEL</TableHead>}
+                <TableHead className="text-white w-40">PUNTOS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -201,7 +208,15 @@ const RankingTable: React.FC<RankingTableProps> = ({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-60">
+                    {showLevel && (
+                        <TableCell className="w-32 text-center">
+                        <span className="inline-flex justify-center px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
+                          Nivel {user.level}
+                        </span>
+                      </TableCell>
+                    )}
+                    {showLevel && !user.level && <TableCell className="w-24"></TableCell>}
+                    <TableCell className="w-40">
                       <div className="flex items-center gap-1.5">
                         <AtipayCoin size="xs" className="text-yellow-500" />
                         <span className="text-sm font-semibold text-gray-900">
