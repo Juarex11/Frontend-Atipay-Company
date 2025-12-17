@@ -33,6 +33,7 @@ import AffiliateNetwork from "./pages/admin/AffiliateNetwork";
 import AdminProfileSettings from "./pages/admin/AdminProfileSettings";
 import AdminPaymentMethods from "./pages/admin/AdminPaymentMethods";
 import SalesRanking from "./pages/SalesRanking";
+import AdminSalesRanking from "./pages/admin/AdminSalesRanking";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -313,6 +314,17 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <AdminPaymentMethods />
+            </AppLayout>
+          </AdminRoute>
+        }
+      />
+
+      <Route
+        path="/admin/ranking"
+        element={
+          <AdminRoute>
+            <AppLayout>
+              <AdminSalesRanking />
             </AppLayout>
           </AdminRoute>
         }
