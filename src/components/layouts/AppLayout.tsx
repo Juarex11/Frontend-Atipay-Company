@@ -83,6 +83,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
         { icon: ShoppingBag, label: "Registrar Compra", href: "/admin/manual-purchase" },
         { icon: Users, label: "Usuarios", href: "/admin/users" },
         { icon: HandCoins, label: "Retiros", href: "/withdrawals" },
+        { icon: Trophy, label: "Ranking de Ventas", href: "/admin/ranking" },
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
         { icon: Gift, label: "Regalos", href: "/admin/gifts" },
         { icon: Gift, label: "Promociones", href: "/promotions" },
