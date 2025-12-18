@@ -118,11 +118,13 @@ const PurchaseHistory: React.FC = () => {
   // Abre visor con objeto completo
   function openProof(purchase: PurchaseRequest) {
     const url = makeFullUrl(purchase.deposit_proof_path);
+    // Cast a 'any' para evitar error de tipos en custom_description
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = purchase as any; 
     setViewerData({
       src: url,
       id: purchase.id,
-      // CORRECCIÓN 1: Usar custom_description
-      productName: purchase.product?.name || (purchase as any).custom_description || 'Compra Manual',
+      productName: purchase.product?.name || p.custom_description || 'Compra Manual',
       date: purchase.created_at,
       status: purchase.deposit_status || purchase.status,
     });
@@ -164,9 +166,11 @@ const PurchaseHistory: React.FC = () => {
   const filteredPurchases = useMemo(() => {
     return purchases
       .filter((p) => (currentTab === "all" ? true : p.status === currentTab))
-      // CORRECCIÓN 2: Búsqueda también por custom_description
       .filter((p) => {
-        const name = (p.product?.name || (p as any).custom_description || 'Compra Manual').toLowerCase();
+        // Cast a 'any' para leer custom_description sin error
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pAny = p as any;
+        const name = (p.product?.name || pAny.custom_description || 'Compra Manual').toLowerCase();
         return name.includes(search.toLowerCase());
       })
       .filter((p) =>
@@ -307,7 +311,12 @@ const PurchaseHistory: React.FC = () => {
 
         <TabsContent value={currentTab} className="mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPurchases.map((purchase, i) => (
+            {filteredPurchases.map((purchase, i) => {
+              // Cast a 'any' aquí para usar dentro del map sin errores
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const pAny = purchase as any;
+              
+              return (
               <motion.div
                 key={purchase.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -329,15 +338,12 @@ const PurchaseHistory: React.FC = () => {
                   <CardHeader className="bg-gray-50 border-b pl-6">
                     <CardTitle className="flex justify-between items-start gap-2">
                       <div className="pr-2 w-3/4">
-                        {/* CORRECCIÓN 3: Título de la tarjeta */}
                         <span className="text-sm font-semibold block truncate">
-                          {purchase.product?.name || (purchase as any).custom_description || 'Compra Manual'}
+                          {purchase.product?.name || pAny.custom_description || 'Compra Manual'}
                         </span>
                         <div className="mt-1 flex gap-2 flex-wrap">
-                          {/* Badge principal (Aprobada/Pendiente/Rechazada) */}
                           {getStatusBadge(purchase.status)}
 
-                          {/* Estado del depósito si aplica */}
                           {(String(purchase.payment_method) === "deposit" || String(purchase.payment_method) === "deposito") &&
                             purchase.deposit_status &&
                             purchase.status === "pending" &&
@@ -357,19 +363,28 @@ const PurchaseHistory: React.FC = () => {
 
                   <CardContent className="pt-4 pl-6 pr-6 pb-6">
                     <div className="flex items-start gap-4">
-                      {/* imagen o placeholder */}
-                      {purchase.product?.image_url ? (
+                      
+                      {/* LÓGICA DE IMAGEN (Corregida y Sin Errores de Tipo) */}
+                      {pAny.image_url ? (
                         <img
-                          src={purchase.product.image_url}
-                          // CORRECCIÓN 4: Alt de la imagen
-                          alt={purchase.product?.name || (purchase as any).custom_description || 'Compra Manual'}
-                          className="h-16 w-16 object-cover rounded-md shadow-sm"
+                          src={pAny.image_url} 
+                          alt={purchase.product?.name || pAny.custom_description || 'Compra'}
+                          className="h-16 w-16 object-cover rounded-md shadow-sm border border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
                         />
                       ) : (
                         <div className="h-16 w-16 bg-gray-100 rounded-md flex items-center justify-center">
                           <Package className="h-8 w-8 text-gray-400" />
                         </div>
                       )}
+
+                      {/* Fallback oculto */}
+                      <div className="hidden h-16 w-16 bg-gray-100 rounded-md flex items-center justify-center">
+                          <Package className="h-8 w-8 text-gray-400" />
+                      </div>
 
                       <div className="flex-1 min-w-0">
                         {/* Metodo de pago */}
@@ -385,23 +400,23 @@ const PurchaseHistory: React.FC = () => {
                         </p>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {/* 1. Badge de Monto (Siempre visible si hay monto) */}
-                          {Number(purchase.amount) > 0 && (
+                          {/* 1. Badge de Monto */}
+                          {/* Usamos pAny.amount para evitar error de tipos */}
+                          {Number(pAny.amount) > 0 && (
                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700">
                               <span>Monto:</span>
                               <span className="text-slate-900 font-bold">
-                                S/ {Number(purchase.amount).toFixed(2)}
+                                S/ {Number(pAny.amount).toFixed(2)}
                               </span>
                             </div>
                           )}
 
                           {/* 2. Badge de Puntos Inteligente */}
                           {(() => {
-                            // Lógica: Si la compra tiene puntos guardados, úsalos. 
-                            // Si no, usa los puntos del producto * cantidad (si existe producto)
-                            const points = Number(purchase.points_earned) > 0 
-                              ? Number(purchase.points_earned) 
-                              : (purchase.product?.points_earned ? Number(purchase.product.points_earned) * (purchase.quantity || 1) : 0);
+                            // Usamos pAny.points_earned y pAny.quantity para evitar error de tipos
+                            const points = Number(pAny.points_earned) > 0 
+                              ? Number(pAny.points_earned) 
+                              : (purchase.product?.points_earned ? Number(purchase.product.points_earned) * (pAny.quantity || 1) : 0);
 
                             if (points > 0) {
                               return (
@@ -521,7 +536,7 @@ const PurchaseHistory: React.FC = () => {
                   </CardContent>
                 </Card>
               </motion.div>
-            ))}
+            )})}
           </div>
         </TabsContent>
       </Tabs>
