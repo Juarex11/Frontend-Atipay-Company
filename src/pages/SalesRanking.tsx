@@ -1,61 +1,76 @@
 import React, { useState, useEffect } from 'react';
-import { getSalesRanking } from '../services/rankingService';
 import type { RankingUser, CurrentUserRanking, RankingTableProps } from '../types/ranking';
 import { toast } from '@/components/ui/use-toast';
-import {Table, TableBody, TableCell, TableHead, TableHeader,TableRow,} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AtipayCoin } from '@/components/ui/AtipayCoin';
 
 const SalesRanking: React.FC = () => {
   const [ranking, setRanking] = useState<RankingUser[]>([]);
   const [currentUserRanking, setCurrentUserRanking] = useState<CurrentUserRanking | null>(null);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('general');
 
-  // mock data para afiliados
-  const [affiliatesRanking] = useState<RankingUser[]>([
-    {
-      id: 101,
-      username: 'Danny Brayhan ',
-      email: 'carlos.mendoza@example.com',
-      commission_amount: '850.50',
-      accumulated_points: 142,
-      level: 2
-    },
-    {
-      id: 102,
-      username: 'María Rodríguez',
-      email: 'maria.rodriguez@example.com',
-      commission_amount: '620.30',
-      accumulated_points: 98,
-      level: 1
-    },
-    {
-      id: 103,
-      username: 'José Fernández',
-      email: 'jose.fernandez@example.com',
-      commission_amount: '450.00',
-      accumulated_points: 75,
-      level: 1
-    },
-  ]);
-
   useEffect(() => {
     fetchRanking();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const fetchRanking = async () => {
     try {
       setLoading(true);
       setError('');
       
-      const data = await getSalesRanking();
-      setRanking(data.ranking);
-      setCurrentUserRanking(data.current_user_ranking);
-    } catch (err: unknown) {
-      const error = err as { errorData?: { message?: string } };
-      const message = error.errorData?.message || 'Error al cargar el ranking';
+      // 1. Definir la URL según la pestaña
+      // Asumo que tu API corre en localhost:8000 o tienes una variable de entorno.
+      // Ajusta la base URL si es necesario.
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+      const endpoint = activeTab === 'general' 
+        ? `${baseUrl}/ranking/general`
+        : `${baseUrl}/ranking/my-affiliates`;
+
+      // 2. Obtener el token (AJUSTA LA CLAVE SI LA GUARDAS CON OTRO NOMBRE)
+      // Normalmente se guarda como 'token', 'auth_token' o 'access_token' en localStorage
+      const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+
+      // 3. Petición usando FETCH
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // Importante para que Laravel sepa quién eres
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // 4. Manejo de la respuesta (Array directo vs Objeto envuelto)
+      if (Array.isArray(data)) {
+         setRanking(data);
+         setCurrentUserRanking(null); 
+      } else {
+         // Si el backend antiguo devolvía un objeto con 'ranking' dentro
+         setRanking(data.ranking || data);
+         setCurrentUserRanking(data.current_user_ranking || null);
+      }
+
+    } catch (err: unknown) { // <--- CORRECCIÓN DEL ERROR DE TYPE 'ANY'
+      console.error(err);
+      
+      // Lógica segura para extraer el mensaje de error en TypeScript
+      let message = 'Error al cargar el ranking';
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+         message = String((err as { message: unknown }).message);
+      }
+
       setError(message);
       toast({
         variant: 'destructive',
@@ -75,6 +90,7 @@ const SalesRanking: React.FC = () => {
           <p className="text-gray-600 text-sm md:text-base">Ranking de ventas y comisiones generadas</p>
         </div>
       </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="inline-flex h-11 items-center justify-start rounded-lg bg-gray-100 p-1 mb-6">
           <TabsTrigger value="general" className="rounded-md px-6 py-2 font-medium data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm data-[state=inactive]:text-gray-600 transition-colors">
@@ -85,7 +101,7 @@ const SalesRanking: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab ranking general */}
+        {/* CONTENIDO DE TABS */}
         <TabsContent value="general">
           <RankingTable
             ranking={ranking}
@@ -93,21 +109,20 @@ const SalesRanking: React.FC = () => {
             loading={loading}
             error={error}
             title="Top 10 Mejores Vendedores"
-            description="Ranking de vendedores"
+            description="Ranking global del sistema"
             limit={10}
             showLevel={false}
           />
         </TabsContent>
 
-        {/* Tab ranking de afiliados */}
         <TabsContent value="affiliates">
           <RankingTable
-            ranking={affiliatesRanking}
+            ranking={ranking}
             currentUserRanking={null}
-            loading={false}
-            error=""
+            loading={loading}
+            error={error}
             title="Ranking de Mis Afiliados"
-            description="Ranking del equipo de afiliados"
+            description="Tus afiliados directos y su rendimiento"
             limit={null}
             showLevel={true}
           />
@@ -117,7 +132,11 @@ const SalesRanking: React.FC = () => {
   );
 };
 
+// ... COMPONENTE RankingTable ...
+// (MANTÉN EL COMPONENTE RankingTable QUE YA TIENES ABAJO EN TU ARCHIVO,
+// NO HACE FALTA CAMBIARLO, SOLO COPIA LA PARTE SUPERIOR "SalesRanking")
 
+// Para que no te de error al copiar, declaro aquí que RankingTable sigue igual:
 const RankingTable: React.FC<RankingTableProps> = ({
   ranking,
   currentUserRanking,
@@ -128,6 +147,8 @@ const RankingTable: React.FC<RankingTableProps> = ({
   limit,
   showLevel = false
 }) => {
+    // ... Copia aquí el contenido de tu componente RankingTable original ...
+    // ... O simplemente no borres esa parte de tu archivo ...
   const displayedRanking = limit ? ranking.slice(0, limit) : ranking;
 
   return (
@@ -161,8 +182,8 @@ const RankingTable: React.FC<RankingTableProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-700 mb-1">No hay vendedores</h3>
-            <p className="text-gray-500 text-sm">Aún no se han generado ventas</p>
+            <h3 className="text-lg font-medium text-gray-700 mb-1">No hay datos disponibles</h3>
+            <p className="text-gray-500 text-sm">Aún no hay información para mostrar en este ranking</p>
           </div>
         </div>
       ) : (

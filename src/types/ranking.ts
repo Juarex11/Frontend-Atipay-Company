@@ -16,10 +16,18 @@ export interface CurrentUserRanking {
   accumulated_points: number;
 }
 
+// Actualizamos la respuesta para que coincida con la paginación de Laravel
 export interface RankingResponse {
-  ranking: RankingUser[];
-  current_user_ranking: CurrentUserRanking | null;
+  data: RankingUser[];      
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
+  // Lo dejamos opcional (?) por si alguna parte antigua del código lo busca, 
+  // pero tu nuevo endpoint ya no lo envía.
+  current_user_ranking?: CurrentUserRanking | null; 
 }
+// -------------------
 
 export interface RankingTableProps {
   ranking: RankingUser[];
