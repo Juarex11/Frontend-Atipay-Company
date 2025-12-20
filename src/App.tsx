@@ -19,6 +19,7 @@ import { StoreManagement } from "@/pages/admin/StoreManagement";
 import { GiftsManagement } from "@/pages/admin/GiftsManagement";
 import ActiveInvestmentsPage from './pages/admin/ActiveInvestmentsPage';
 
+
 import UserAffiliates from "@/pages/usuario/UserAffiliates";
 import UserProfile from "./pages/usuario/UserProfile";
 import GiftCatalog from "./pages/usuario/GiftCatalog";
@@ -35,6 +36,7 @@ import AdminPaymentMethods from "./pages/admin/AdminPaymentMethods";
 import SalesRanking from "./pages/SalesRanking";
 import AdminSalesRanking from "./pages/admin/AdminSalesRanking";
 import NotFound from "./pages/NotFound";
+import { ManualPurchasePage } from "./pages/admin/ManualPurchasePage";
 
 const queryClient = new QueryClient();
 
@@ -345,6 +347,18 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <AdminProfileSettings />
+            </AppLayout>
+          </AdminRoute>
+        }
+      />
+
+      {/* Registro de Compra Manual (admin) */}
+      <Route
+        path="/admin/manual-purchase"
+        element={
+          <AdminRoute>
+            <AppLayout>
+              <ManualPurchasePage />
             </AppLayout>
           </AdminRoute>
         }

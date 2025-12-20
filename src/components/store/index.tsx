@@ -85,7 +85,8 @@ export function Store() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // CAMBIO 1: El estado inicial ahora es 'product' para que aparezca seleccionado por defecto
+  const [selectedCategory, setSelectedCategory] = useState<string | null>("product");
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -136,10 +137,18 @@ export function Store() {
     addToCart(product);
   };
 
-  const categories = Array.from(new Set(products.map(p => p.category))).map(category => ({
-    value: category,
-    label: category.charAt(0).toUpperCase() + category.slice(1),
-  }));
+  // CAMBIO 2: Ordenamos las categorías para que 'product' salga primero si existe
+  const categories = Array.from(new Set(products.map(p => p.category)))
+    .map(category => ({
+      value: category,
+      label: category.charAt(0).toUpperCase() + category.slice(1),
+    }))
+    .sort((a, b) => {
+      // Forzamos que 'product' sea el primero en la lista generada
+      if (a.value === 'product') return -1;
+      if (b.value === 'product') return 1;
+      return 0; 
+    });
 
   if (isLoading) {
     return (
@@ -256,15 +265,7 @@ export function Store() {
           {/* Category filters */}
           <div className="mb-6 mt-4">
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={`px-4 py-2 rounded-full text-sm font-medium ${selectedCategory === null
-                  ? 'bg-green-600 text-black'
-                  : 'bg-green-600 text-white hover:bg-green-600'
-                  }`}
-              >
-                Todos
-              </button>
+              {/* CAMBIO 3: Renderizamos PRIMERO las categorías (Product, Course, etc.) */}
               {categories.map((category) => (
                 <button
                   key={category.value}
@@ -277,6 +278,17 @@ export function Store() {
                   {category.label}
                 </button>
               ))}
+
+              {/* CAMBIO 4: El botón TODOS se mueve al final */}
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-4 py-2 rounded-full text-sm font-medium ${selectedCategory === null
+                  ? 'bg-green-600 text-black'
+                  : 'bg-green-600 text-white hover:bg-green-600'
+                  }`}
+              >
+                Todos
+              </button>
             </div>
           </div>
 

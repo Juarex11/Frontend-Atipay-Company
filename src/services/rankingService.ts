@@ -36,10 +36,17 @@ const getAuthHeaders = () => {
   };
 };
 
-export const getSalesRanking = async (): Promise<RankingResponse> => {
-  const response = await fetch(`${API_BASE_URL}/affiliate/ranking`, {
-    headers: getAuthHeaders(),
-  });
+// 1. Aceptamos el argumento 'page' (default = 1).
+// 2. Cambiamos la URL a '/admin/ranking' (la nueva ruta que creamos).
+export const getSalesRanking = async (
+  page: number = 1, 
+  view: 'global' | 'mine' = 'global',
+  search: string = '' // Parámetro de búsqueda opcional
+): Promise<RankingResponse> => {
+  const response = await fetch(
+    `${API_BASE_URL}/admin/ranking?page=${page}&view=${view}&search=${search}`, 
+    { headers: getAuthHeaders() }
+  );
   
   return handleResponse<RankingResponse>(response);
 };
@@ -50,4 +57,5 @@ export const getMyAffiliates = async (): Promise<RankingUser[]> => {
   });
 
   return handleResponse<RankingUser[]>(response);
+};
 };

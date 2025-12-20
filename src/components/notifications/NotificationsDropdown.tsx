@@ -115,7 +115,8 @@ interface PurchaseRequest {
 
 interface BaseNotification {
   id: string;
-  type: 'topup' | 'withdrawal' | 'transfer' | 'new_user' | 'investment' | 'investment_withdrawal' | 'withdrawal_request' | 'purchase_request';
+  // FIX: Agregamos 'purchase_reward' para manejar recompensas por compra
+  type: 'topup' | 'withdrawal' | 'transfer' | 'new_user' | 'investment' | 'investment_withdrawal' | 'withdrawal_request' | 'purchase_request' | 'purchase_reward';
   userId: string;
   userName: string;
   amount?: number;
@@ -148,7 +149,9 @@ const getNotificationLink = (type: string, userId?: string) => {
     'investment_withdrawal': "/admin/dashboard?tab=investment-withdrawals",
     'withdrawal_request': "/withdrawals",
     'new_user': "/admin/users",
-    'purchase_request': "/admin/store?tab=purchases"
+    'purchase_request': "/admin/store?tab=purchases",
+    // FIX: recompensas por compra deben dirigir al historial de compras del usuario
+    'purchase_reward': "/store?tab=purchases"
   };
   
   const baseUrl = baseUrls[type] || "/admin/dashboard?tab=recharges";
@@ -198,7 +201,7 @@ export function NotificationsDropdown() {
 
   const fetchRecharges = async (headers: HeadersInit): Promise<Recharge[]> => {
     try {
-      const rechargesRes = await fetch('https://127.0.0.1:8000/api/atipay-recharges', { headers });
+      const rechargesRes = await fetch('http://127.0.0.1:8000/api/atipay-recharges', { headers });
       if (rechargesRes.ok) {
         const rechargesData = await rechargesRes.json();
         return Array.isArray(rechargesData) ? rechargesData : rechargesData?.data || [];
@@ -212,7 +215,7 @@ export function NotificationsDropdown() {
 
   const fetchUsers = async (headers: HeadersInit): Promise<User[]> => {
     try {
-      const usersRes = await fetch('https://127.0.0.1:8000/api/users', { headers });
+      const usersRes = await fetch('http://127.0.0.1:8000/api/users', { headers });
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         return Array.isArray(usersData) ? usersData : usersData?.data || [];
@@ -236,7 +239,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const response = await fetch('https://127.0.0.1:8000/api/withdrawals', {
+      const response = await fetch('http://127.0.0.1:8000/api/withdrawals', {
         headers,
         method: 'GET'
       });
@@ -263,7 +266,7 @@ export function NotificationsDropdown() {
 
   const fetchPurchaseRequests = async (headers: HeadersInit): Promise<PurchaseRequest[]> => {
     try {
-      const response = await fetch('https://127.0.0.1:8000/api/products/purchase-requests', {
+      const response = await fetch('http://127.0.0.1:8000/api/products/purchase-requests', {
         headers,
         method: 'GET'
       });
@@ -286,6 +289,57 @@ export function NotificationsDropdown() {
     }
   };
 
+  // FIX: Fetch notifications stored in the backend DB (available to all users)
+  const fetchDBNotifications = async (headers: HeadersInit): Promise<Notification[]> => {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/notifications', {
+        headers,
+        method: 'GET'
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Failed to fetch DB notifications:', { status: res.status, statusText: res.statusText, error: errText });
+        return [];
+      }
+
+      const payload = await res.json();
+      // Backend may return array, or { data: [...] }, or a single object
+      const items = Array.isArray(payload) ? payload : payload?.data ? payload.data : (payload ? [payload] : []);
+
+      return (items as Array<Record<string, unknown>>).map((item) => {
+        // Normalizamos distintos campos que el backend podría enviar
+        const typeFromBackend = (item['type'] as string) || (item['notification_type'] as string) || (item['event'] as string) || (item['category'] as string) || null;
+        const isPurchaseReward = typeFromBackend === 'purchase_reward' || (item['category'] as string) === 'purchase_reward';
+
+        const idVal = item['id'] ? String(item['id']) : Math.random().toString(36).slice(2, 9);
+        const userObj = item['user'] as Record<string, unknown> | undefined;
+        const userIdVal = (item['user_id'] ? String(item['user_id']) : undefined) || (userObj && userObj['id'] ? String(userObj['id']) : undefined) || (item['userId'] ? String(item['userId']) : 'unknown');
+        const userNameVal = (item['user_name'] as string) || (userObj && (userObj['name'] as string)) || (userObj && (userObj['username'] as string)) || 'Usuario';
+        const amountVal = typeof item['amount'] === 'number' ? (item['amount'] as number) : (item['value'] ? Number(item['value'] as string) : undefined);
+
+        const baseMessage = (item['message'] as string) || (item['body'] as string) || undefined;
+
+        const mapped: Notification = {
+          id: `db-${idVal}`,
+          type: isPurchaseReward ? 'purchase_reward' : ((typeFromBackend as Notification['type']) || 'topup'),
+          userId: userIdVal || 'unknown',
+          userName: userNameVal,
+          amount: amountVal as number | undefined,
+          status: (item['status'] as string) || undefined,
+          createdAt: item['created_at'] ? new Date(String(item['created_at'])) : new Date(),
+          userData: userObj ? (userObj as unknown as User) : undefined,
+          message: baseMessage
+        };
+
+        return mapped;
+      });
+    } catch (error) {
+      console.error('Error fetching DB notifications:', error);
+      return [];
+    }
+  };
+
 
   const fetchInvestments = async (headers: HeadersInit): Promise<Investment[]> => {
     const userJson = localStorage.getItem("user");
@@ -299,7 +353,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const investmentsRes = await fetch('https://127.0.0.1:8000/api/investments/pending', {
+      const investmentsRes = await fetch('http://127.0.0.1:8000/api/investments/pending', {
         headers,
         method: 'GET'
       });
@@ -388,6 +442,21 @@ export function NotificationsDropdown() {
   };
 
   const getNotificationMessage = (notification: Notification): React.ReactNode => {
+
+    // FIX: Mostrar recompensas por compra con estilo distintivo
+    if (notification.type === 'purchase_reward') {
+      return (
+        <span className="text-green-700 font-medium flex items-center">
+          {notification.message ? notification.message : 'Has recibido puntos por una compra'}
+          {typeof notification.amount === 'number' && (
+            <span className="ml-2 flex items-center">
+              <AtipayCoin size="xs" className="mr-1" />
+              {notification.amount.toFixed(2)} pts
+            </span>
+          )}
+        </span>
+      );
+    }
 
     if (notification.type === 'new_user') {
       if (notification.id === 'today-users-summary') {
@@ -506,99 +575,123 @@ export function NotificationsDropdown() {
 
         const readNotifications = getReadNotifications();
 
-        const [recharges, users, investments, , withdrawals, purchaseRequests] = await Promise.all([
-          fetchRecharges(headers),
-          fetchUsers(headers),
-          fetchInvestments(headers),
-          // Se eliminó fetchInvestmentWithdrawals() ya que no se estaba utilizando
-          Promise.resolve([]), // Placeholder para mantener el orden
-          fetchWithdrawals(headers),
-          fetchPurchaseRequests(headers)
-        ]);
+        // Detectamos si el usuario actual es admin para evitar llamadas protegidas desde usuarios normales
+        const userJson = localStorage.getItem('user');
+        let isAdmin = false;
+        try {
+          const parsed = userJson ? JSON.parse(userJson) : null;
+          isAdmin = parsed?.role === 'admin';
+        } catch {
+          isAdmin = false;
+        }
 
-        const pendingInvestments = mapInvestmentsToNotifications(investments);
-        const pendingRecharges = mapRechargesToNotifications(recharges);
-        const newUsers = mapUsersToNotifications(users);
+        let adminNotifications: Notification[] = [];
 
-        const pendingPurchaseRequests = purchaseRequests
-          .filter((pr: PurchaseRequest) => pr.status === 'pending')
-          .map(pr => {
-            const price = Number(pr.product?.price) || 0;
-            const quantity = pr.quantity || 1;
-            const totalPrice = price * quantity;
-            const totalText = (
-              <span className="flex items-center">
-                <AtipayCoin size="xs" className="mr-1" />
-                {totalPrice.toFixed(2)}
-              </span>
-            );
-            const userName = pr.user?.name || pr.user?.username || pr.user_name || 'Usuario';
-            const productName = pr.product?.name || 'un producto';
+        if (isAdmin) {
+          // FIX: Mantener intacta la lógica existente para admins (Promise.all y mapeos)
+          const [recharges, users, investments, , withdrawals, purchaseRequests] = await Promise.all([
+            fetchRecharges(headers),
+            fetchUsers(headers),
+            fetchInvestments(headers),
+            // Se eliminó fetchInvestmentWithdrawals() ya que no se estaba utilizando
+            Promise.resolve([]), // Placeholder para mantener el orden
+            fetchWithdrawals(headers),
+            fetchPurchaseRequests(headers)
+          ]);
 
-            return {
-              id: `purchase-request-${pr.id}`,
-              type: 'purchase_request' as const,
-              userId: pr.user_id,
-              userName,
-              amount: totalPrice, // Using total price for sorting
-              status: pr.status,
-              createdAt: new Date(pr.created_at || Date.now()),
-              product: pr.product ? {
-                id: pr.product.id,
-                name: pr.product.name,
-                price: price,
-                quantity: quantity
-              } : undefined,
-              userData: pr.user || undefined,
-              message: (
-              <span>
-                {userName} ha solicitado comprar {quantity > 1 ? `${quantity} unidades de ${productName}` : productName} por {totalText}
-              </span>
-            )
-            };
-          });
+          const pendingInvestments = mapInvestmentsToNotifications(investments);
+          const pendingRecharges = mapRechargesToNotifications(recharges);
+          const newUsers = mapUsersToNotifications(users);
 
-        const pendingWithdrawals = withdrawals
-          .filter((w: Withdrawal) => w.status === 'pending')
-          .map(w => ({
-            id: `withdrawal-${w.id}`,
-            type: 'withdrawal_request' as const,
-            userId: w.user_id.toString(),
-            userName: w.user_name,
-            amount: w.amount,
-            status: w.status,
-            createdAt: new Date(w.created_at),
-            message: `Solicitud de retiro por $${w.amount.toFixed(2)}`,
-            userData: {
-              id: parseInt(w.user_id) || 0,
-              username: w.user?.username || w.user_name,
-              name: w.user?.name || w.user_name,
-              email: w.user?.email || '',
-              role_id: w.user?.role_id || 0,
-              status: w.user?.status || '',
-              atipay_money: w.user?.atipay_money || 0,
-              accumulated_points: w.user?.accumulated_points || 0,
-              reference_code: w.user?.reference_code || '',
-              referred_by: w.user?.referred_by || null,
-              registration_date: new Date().toISOString(),
-              registration_time: new Date().toISOString(),
-              referral_url: '',
-              created_at: w.created_at || new Date().toISOString(),
-              updated_at: w.updated_at || new Date().toISOString()
-            } as User
-          }));
+          const pendingPurchaseRequests = purchaseRequests
+            .filter((pr: PurchaseRequest) => pr.status === 'pending')
+            .map(pr => {
+              const price = Number(pr.product?.price) || 0;
+              const quantity = pr.quantity || 1;
+              const totalPrice = price * quantity;
+              const totalText = (
+                <span className="flex items-center">
+                  <AtipayCoin size="xs" className="mr-1" />
+                  {totalPrice.toFixed(2)}
+                </span>
+              );
+              const userName = pr.user?.name || pr.user?.username || pr.user_name || 'Usuario';
+              const productName = pr.product?.name || 'un producto';
 
-        // Show all notifications, not limited to 10
-        const allNotifications = [
-          ...pendingInvestments,
-          ...pendingRecharges,
-          ...newUsers,
-          ...pendingWithdrawals,
-          ...pendingPurchaseRequests
+              return {
+                id: `purchase-request-${pr.id}`,
+                type: 'purchase_request' as const,
+                userId: pr.user_id,
+                userName,
+                amount: totalPrice, // Using total price for sorting
+                status: pr.status,
+                createdAt: new Date(pr.created_at || Date.now()),
+                product: pr.product ? {
+                  id: pr.product.id,
+                  name: pr.product.name,
+                  price: price,
+                  quantity: quantity
+                } : undefined,
+                userData: pr.user || undefined,
+                message: (
+                <span>
+                  {userName} ha solicitado comprar {quantity > 1 ? `${quantity} unidades de ${productName}` : productName} por {totalText}
+                </span>
+              )
+              };
+            });
+
+          const pendingWithdrawals = withdrawals
+            .filter((w: Withdrawal) => w.status === 'pending')
+            .map(w => ({
+              id: `withdrawal-${w.id}`,
+              type: 'withdrawal_request' as const,
+              userId: w.user_id.toString(),
+              userName: w.user_name,
+              amount: w.amount,
+              status: w.status,
+              createdAt: new Date(w.created_at),
+              message: `Solicitud de retiro por $${w.amount.toFixed(2)}`,
+              userData: {
+                id: parseInt(w.user_id) || 0,
+                username: w.user?.username || w.user_name,
+                name: w.user?.name || w.user_name,
+                email: w.user?.email || '',
+                role_id: w.user?.role_id || 0,
+                status: w.user?.status || '',
+                atipay_money: w.user?.atipay_money || 0,
+                accumulated_points: w.user?.accumulated_points || 0,
+                reference_code: w.user?.reference_code || '',
+                referred_by: w.user?.referred_by || null,
+                registration_date: new Date().toISOString(),
+                registration_time: new Date().toISOString(),
+                referral_url: '',
+                created_at: w.created_at || new Date().toISOString(),
+                updated_at: w.updated_at || new Date().toISOString()
+              } as User
+            }));
+
+          // Show all notifications for admin, not limited to 10
+          adminNotifications = [
+            ...pendingInvestments,
+            ...pendingRecharges,
+            ...newUsers,
+            ...pendingWithdrawals,
+            ...pendingPurchaseRequests
+          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        }
+
+        // Always fetch DB notifications for all users
+        const dbNotifications = await fetchDBNotifications(headers);
+
+        // Combine admin notifications (if any) + DB notifications
+        const combinedNotifications = [
+          ...adminNotifications,
+          ...dbNotifications
         ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
         // Filtrar notificaciones leídas
-        const unreadNotifications = allNotifications.filter(notification => !readNotifications.has(notification.id));
+        const unreadNotifications = combinedNotifications.filter(notification => !readNotifications.has(notification.id));
         
         setNotifications(unreadNotifications);
       } catch (error) {
