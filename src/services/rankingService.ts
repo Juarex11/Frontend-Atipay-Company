@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../config';
-import type { RankingResponse } from '../types/ranking';
+import type { RankingResponse, RankingUser } from '../types/ranking';
 
 interface ErrorResponse {
   message?: string;
@@ -49,4 +49,13 @@ export const getSalesRanking = async (
   );
   
   return handleResponse<RankingResponse>(response);
+};
+
+export const getMyAffiliates = async (): Promise<RankingUser[]> => {
+  const response = await fetch(`${API_BASE_URL}/ranking/my-affiliates`, {
+    headers: getAuthHeaders(),
+  });
+
+  return handleResponse<RankingUser[]>(response);
+};
 };

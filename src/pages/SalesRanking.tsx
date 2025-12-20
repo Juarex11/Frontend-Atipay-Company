@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getSalesRanking, getMyAffiliates } from '../services/rankingService';
 import type { RankingUser, CurrentUserRanking, RankingTableProps } from '../types/ranking';
 import { toast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,9 +14,19 @@ const SalesRanking: React.FC = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('general');
 
+  const [affiliatesRanking, setAffiliatesRanking] = useState<RankingUser[]>([]);
+  const [affiliatesLoading, setAffiliatesLoading] = useState(false);
+  const [affiliatesError, setAffiliatesError] = useState('');
+
   useEffect(() => {
     fetchRanking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'affiliates') {
+      fetchAffiliates();
+    }
   }, [activeTab]);
 
   const fetchRanking = async () => {
@@ -82,6 +93,27 @@ const SalesRanking: React.FC = () => {
     }
   };
 
+  const fetchAffiliates = async () => {
+    try {
+      setAffiliatesLoading(true);
+      setAffiliatesError('');
+
+      const data = await getMyAffiliates();
+      setAffiliatesRanking(data);
+    } catch (err: unknown) {
+      const error = err as { errorData?: { message?: string } };
+      const message = error.errorData?.message || 'Error al cargar los afiliados';
+      setAffiliatesError(message);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: message,
+      });
+    } finally {
+      setAffiliatesLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -119,6 +151,8 @@ const SalesRanking: React.FC = () => {
           <RankingTable
             ranking={ranking}
             currentUserRanking={null}
+            loading={affiliatesLoading}
+            error={affiliatesError}
             loading={loading}
             error={error}
             title="Ranking de Mis Afiliados"
@@ -248,6 +282,40 @@ const RankingTable: React.FC<RankingTableProps> = ({
                   </TableRow>
                 );
               })}
+              {limit && currentUserRanking && !displayedRanking.some(u => u.id === currentUserRanking.id) && (
+                <TableRow key={`current-user-${currentUserRanking.id}`} className="bg-green-50">
+                  <TableCell className="text-center w-32">
+                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium ${
+                      currentUserRanking.position === 1
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : currentUserRanking.position === 2
+                        ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                        : currentUserRanking.position === 3
+                        ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                        : 'bg-gray-50 text-gray-600 border border-gray-200'
+                    }`}>
+                      #{currentUserRanking.position}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-900">
+                        {currentUserRanking.username}
+                        <span className="ml-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Tú</span>
+                      </span>
+                    </div>
+                  </TableCell>
+                  {showLevel && <TableCell className="w-32 text-center"></TableCell>}
+                  <TableCell className="w-40">
+                    <div className="flex items-center gap-1.5">
+                      <AtipayCoin size="xs" className="text-yellow-500" />
+                      <span className="text-sm font-semibold text-gray-900">
+                        {currentUserRanking.accumulated_points.toLocaleString('es-ES')}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
