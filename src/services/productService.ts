@@ -226,16 +226,28 @@ export const productService = {
   },
 
   async updateProduct(id: string, data: FormData): Promise<Product> {
+    
+    // 1. EL TRUCO DE LARAVEL: Asegurar que _method = PUT esté presente
+    if (!data.has('_method')) {
+      data.append('_method', 'PUT');
+    }
+
+    // 2. Validar token usando tu helper existente
+    const token = await this.validateAuth();
+
+    // 3. Enviar como POST (para que pasen los archivos)
     const response = await fetch(API_ROUTES.PRODUCTS.BY_ID(id), {
-      method: 'PUT',
+      method: 'POST', // <--- IMPORTANTE: POST
       headers: {
-        ...getAuthHeaders(),
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
       },
       body: data,
     });
 
+    // 4. Manejo de errores consistente
     if (!response.ok) {
-      throw new Error('Failed to update product');
+      return this.handleApiError(response);
     }
 
     return response.json();

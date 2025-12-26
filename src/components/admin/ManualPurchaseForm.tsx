@@ -1,22 +1,25 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
     getUsersForSelector, 
     getProductsForSelector, 
     storeManualPurchase, 
     annulPurchase, 
     assignPrivatePack,
-    getPacks,               
+    getPacks,              
     getConversionRules,
-    createPack,
-    updatePack
+    updatePack,
+    createPack
 } from '../../services/adminPurchaseService';
 
-import { History, Clock, Trash2, X, Wallet, Banknote, AlertTriangle, CheckCircle2, Package, Upload, Image as ImageIcon, LayoutDashboard, ChevronRight, Layers, AlertCircle, Info } from 'lucide-react';
+import { History, Trash2, LayoutDashboard, ChevronRight, Layers, Image as ImageIcon } from 'lucide-react';
 import { ATIPAY_ICON_SRC, STORAGE_KEY, safeParseFloat } from './manual-purchase/types';
 import type { User, CartItem, TransactionLog } from './manual-purchase/types';
 import type { Product, Pack, ConversionRule } from '../../services/adminPurchaseService';
 import { CatalogPanel } from './manual-purchase/CatalogPanel';
 import { CartPanel } from './manual-purchase/CartPanel';
+
+// ✅ CORRECCIÓN: Importamos desde la carpeta correcta
+import { CreatePackModal } from './manual-purchase/CreatePackModal'; 
 
 export const ManualPurchaseForm = () => {
     // --- DATOS ---
@@ -42,7 +45,12 @@ export const ManualPurchaseForm = () => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showClearModal, setShowClearModal] = useState(false);
     const [showPackNameModal, setShowPackNameModal] = useState(false);
+    
+    // Modal antiguo (Lo mantenemos para edición si es necesario)
     const [showGlobalPackModal, setShowGlobalPackModal] = useState(false);
+
+    // ✅ ESTADO PARA EL NUEVO MODAL DE PACKS
+    const [showCreatePackModal, setShowCreatePackModal] = useState(false);
     
     // --- FORMULARIOS ---
     const [packNameInput, setPackNameInput] = useState('');
@@ -94,7 +102,7 @@ export const ManualPurchaseForm = () => {
     useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); }, [history]);
 
     // =========================================================
-    // 🧠 LÓGICA MODAL PACKS
+    // LÓGICA MODAL PACKS ANTIGUO (Mantener para compatibilidad)
     // =========================================================
     const [modalProducts, setModalProducts] = useState<{id: string, productId: string, name: string, price: number}[]>([]);
 
@@ -111,25 +119,8 @@ export const ManualPurchaseForm = () => {
 
                 const initialDist: Record<number, number> = {};
                 editingPack.products?.forEach(p => {
-                    initialDist[p.id] = Number((p as any).pivot?.assigned_points || 0);
-                });
-                setPointsDistribution(initialDist);
-            } else {
-                const fromCart = cart
-                    .filter(item => item.type === 'product' && item.productId)
-                    .map(item => ({
-                        id: item.id,
-                        productId: item.productId!,
-                        name: item.name,
-                        price: item.price || 0
-                    }));
-                setModalProducts(fromCart);
-
-                const initialDist: Record<number, number> = {};
-                fromCart.forEach(p => {
-                    const pid = parseInt(p.productId);
-                    const cartItem = cart.find(c => c.id === p.id);
-                    initialDist[pid] = cartItem ? (Number(cartItem.points) || 0) : 0;
+                    // @ts-ignore
+                    initialDist[p.id] = Number(p.pivot?.assigned_points || 0);
                 });
                 setPointsDistribution(initialDist);
             }
@@ -144,42 +135,6 @@ export const ManualPurchaseForm = () => {
 
     const handleRemoveFromModal = (visualId: string) => {
         setModalProducts(prev => prev.filter(p => p.id !== visualId));
-    };
-
-    // --- HANDLERS ---
-    const handleAddProduct = (product: Product) => {
-        const safePrice = safeParseFloat(product.price);
-        const safePoints = Number(product.points) > 0 ? Number(product.points) : (safePrice / 3);
-        setCart([...cart, { id: Date.now().toString(), productId: product.id, name: product.name, price: safePrice, points: safePoints, type: 'product' }]);
-    };
-    const handleAddPack = (pack: Pack) => setCart([...cart, { id: Date.now().toString(), name: `Pack: ${pack.name}`, price: Number(pack.total_pack_price), points: Number(pack.total_pack_points), type: 'product', description: 'Pack Predefinido' }]);
-    const handleAddLooseItem = (amount: number, desc: string, ruleId: string | null, manualPoints?: number) => setCart([...cart, { id: Date.now().toString(), name: `Abarrotes: ${desc}`, price: amount, points: manualPoints ?? 0, type: 'loose', description: ruleId === 'manual' ? 'Puntos Manuales' : 'Regla de Conversión' }]);
-    const handleRemoveItem = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) setSelectedImage(e.target.files[0]); };
-
-    // --- MODALES ---
-    const handleOpenPackModal = () => {
-        setSuccessMsg(null); setErrorMsg(null);
-        if (!selectedUser) return setErrorMsg('Selecciona un cliente.');
-        if (cart.length === 0) return setErrorMsg('Carrito vacío.');
-        setPackNameInput(`Pedido Especial para ${selectedUserData?.username || 'Cliente'}`);
-        setSelectedImage(null); setShowPackNameModal(true);
-    };
-
-    const handleOpenGlobalPackModal = () => {
-        setSuccessMsg(null); setErrorMsg(null);
-        if (cart.length === 0) return setErrorMsg("Agrega productos.");
-        if(!cart.some(item => item.type === 'product')) return setErrorMsg("Debe haber productos del catálogo.");
-        
-        setEditingPack(null);
-        setPackNameInput(""); 
-        setShowGlobalPackModal(true);
-    };
-
-    const handleEditPackSelect = (pack: Pack) => {
-        setEditingPack(pack);
-        setPackNameInput(pack.name);
-        setShowGlobalPackModal(true);
     };
 
     const handleSaveGlobalPack = async () => {
@@ -211,8 +166,34 @@ export const ManualPurchaseForm = () => {
             await refreshAllData(); 
             
         } catch (error) {
-            setErrorMsg(error instanceof Error ? error.message : 'Error al guardar.');
+            // @ts-ignore
+            setErrorMsg(error.message || 'Error al guardar.');
         } finally { setLoading(false); }
+    };
+
+    // --- HANDLERS ---
+    const handleAddProduct = (product: Product) => {
+        const safePrice = safeParseFloat(product.price);
+        const safePoints = Number(product.points) > 0 ? Number(product.points) : (safePrice / 3);
+        setCart([...cart, { id: Date.now().toString(), productId: product.id, name: product.name, price: safePrice, points: safePoints, type: 'product' }]);
+    };
+    const handleAddPack = (pack: Pack) => setCart([...cart, { id: Date.now().toString(), name: `Pack: ${pack.name}`, price: Number(pack.total_pack_price), points: Number(pack.total_pack_points), type: 'product', description: 'Pack Predefinido' }]);
+    const handleAddLooseItem = (amount: number, desc: string, ruleId: string | null, manualPoints?: number) => setCart([...cart, { id: Date.now().toString(), name: `Abarrotes: ${desc}`, price: amount, points: manualPoints ?? 0, type: 'loose', description: ruleId === 'manual' ? 'Puntos Manuales' : 'Regla de Conversión' }]);
+    const handleRemoveItem = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
+    
+    // --- MODALES ---
+    const handleOpenPackModal = () => { // Pack Privado (Cliente)
+        setSuccessMsg(null); setErrorMsg(null);
+        if (!selectedUser) return setErrorMsg('Selecciona un cliente.');
+        if (cart.length === 0) return setErrorMsg('Carrito vacío.');
+        setPackNameInput(`Pedido Especial para ${selectedUserData?.username || 'Cliente'}`);
+        setSelectedImage(null); setShowPackNameModal(true);
+    };
+
+    const handleEditPackSelect = (pack: Pack) => {
+        setEditingPack(pack);
+        setPackNameInput(pack.name);
+        setShowGlobalPackModal(true);
     };
 
     // Procesos de Venta
@@ -247,7 +228,10 @@ export const ManualPurchaseForm = () => {
                         products={products} packs={packs} rules={rules} 
                         loading={productsLoading} 
                         onAddProduct={handleAddProduct} onAddPack={handleAddPack} onAddLooseItem={handleAddLooseItem} 
-                        onSaveCartAsPack={handleOpenGlobalPackModal} 
+                        
+                        // ✅ CONEXIÓN CORRECTA AL NUEVO MODAL
+                        onSaveCartAsPack={() => setShowCreatePackModal(true)} 
+                        
                         onRulesChange={refreshAllData} 
                         onEditPack={handleEditPackSelect} 
                     />
@@ -257,7 +241,7 @@ export const ManualPurchaseForm = () => {
                 </div>
             </div>
 
-            {/* ✅ HISTORIAL RESTAURADO */}
+            {/* HISTORIAL */}
             <div className="mt-10">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -288,124 +272,65 @@ export const ManualPurchaseForm = () => {
                 </div>
             </div>
 
-            {/* MODALES */}
+            {/* MODALES CLÁSICOS */}
             {showConfirmModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-md p-6"><h3 className="font-bold text-xl mb-4 text-center">Confirmar Venta</h3><div className="flex gap-3"><button onClick={() => setShowConfirmModal(false)} className="flex-1 py-3 border rounded-xl">Cancelar</button><button onClick={handleFinalProcessSale} className="flex-1 py-3 bg-green-600 text-white rounded-xl">Confirmar</button></div></div></div>)}
             {showPackNameModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-md p-6"><h3 className="font-bold text-xl mb-4 text-center">Crear Pack Privado</h3><input type="text" className="w-full border p-3 rounded-xl mb-4" value={packNameInput} onChange={e => setPackNameInput(e.target.value)} /><div className="flex gap-3"><button onClick={() => setShowPackNameModal(false)} className="flex-1 py-3 border rounded-xl">Cancelar</button><button onClick={handleCreatePack} className="flex-1 py-3 bg-blue-600 text-white rounded-xl">Crear</button></div></div></div>)}
             {itemToAnnul && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-sm p-6 text-center"><h3 className="font-bold text-lg mb-2">¿Anular Venta?</h3><div className="flex gap-3"><button onClick={() => setItemToAnnul(null)} className="flex-1 py-2 border rounded-xl">No</button><button onClick={confirmAnnulment} className="flex-1 py-2 bg-red-600 text-white rounded-xl">Sí, Anular</button></div></div></div>)}
             {showClearModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-sm p-6 text-center"><h3 className="font-bold text-lg mb-4">¿Limpiar Historial?</h3><div className="flex gap-3"><button onClick={() => setShowClearModal(false)} className="flex-1 py-2 border rounded-xl">Cancelar</button><button onClick={() => {setHistory([]); setShowClearModal(false);}} className="flex-1 py-2 bg-gray-900 text-white rounded-xl">Limpiar</button></div></div></div>)}
 
-            {/* MODAL 5: PACK GLOBAL (FLEXIBLE) */}
+            {/* MODAL GLOBAL ANTIGUO (Solo para editar packs viejos) */}
             {showGlobalPackModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
                     <div className="bg-white p-0 rounded-3xl w-full max-w-lg shadow-2xl border border-purple-100 flex flex-col max-h-[85vh]">
                         <div className="bg-purple-50 p-6 border-b border-purple-100 flex flex-col items-center">
-                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm">
-                                <Layers className="w-6 h-6 text-purple-600"/>
-                            </div>
-                            <h3 className="font-bold text-xl text-gray-900">
-                                {editingPack ? 'Editar Pack Global' : 'Crear Pack Global'}
-                            </h3>
-                            <p className="text-xs text-purple-700 text-center">
-                                Total Calculado: <strong>{currentDistSum.toFixed(2)} pts</strong>
-                            </p>
+                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm"><Layers className="w-6 h-6 text-purple-600"/></div>
+                            <h3 className="font-bold text-xl text-gray-900">{editingPack ? 'Editar Pack Global' : 'Crear Pack Global'}</h3>
+                            <p className="text-xs text-purple-700 text-center">Total Calculado: <strong>{currentDistSum.toFixed(2)} pts</strong></p>
                         </div>
-                        
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                             <div className="mb-5">
                                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">Nombre del Pack</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                                    placeholder="Ej. Pack Verano 2025"
-                                    value={packNameInput}
-                                    onChange={(e) => setPackNameInput(e.target.value)}
-                                    autoFocus
-                                />
+                                <input type="text" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all" placeholder="Ej. Pack Verano 2025" value={packNameInput} onChange={(e) => setPackNameInput(e.target.value)} autoFocus />
                             </div>
-
                             <div className="mb-2">
                                 <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-500 font-semibold text-xs uppercase">
-                                            <tr>
-                                                <th className="px-4 py-3">Producto</th>
-                                                <th className="px-4 py-3 text-right">Precio</th>
-                                                <th className="px-4 py-3 text-right w-24">Puntos</th>
-                                                <th className="px-2 py-3 w-8"></th>
-                                            </tr>
-                                        </thead>
+                                        <thead className="bg-gray-50 text-gray-500 font-semibold text-xs uppercase"><tr><th className="px-4 py-3">Producto</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right w-24">Puntos</th><th className="px-2 py-3 w-8"></th></tr></thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {modalProducts.map((prod) => (
                                                 <tr key={prod.id}> 
                                                     <td className="px-4 py-3 font-medium text-gray-800">{prod.name}</td>
                                                     <td className="px-4 py-3 text-right text-gray-500">S/ {prod.price?.toFixed(2)}</td>
                                                     <td className="px-4 py-2 text-right">
-                                                        <input 
-                                                            type="number" 
-                                                            className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-right focus:outline-none focus:border-purple-500 font-mono text-sm"
-                                                            value={pointsDistribution[parseInt(prod.productId!)] || 0}
-                                                            onChange={(e) => {
-                                                                const val = parseFloat(e.target.value);
-                                                                const pid = parseInt(prod.productId!);
-                                                                setPointsDistribution(prev => ({...prev, [pid]: isNaN(val) ? 0 : val}));
-                                                            }}
-                                                            step="0.01"
-                                                        />
+                                                        <input type="number" className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-right focus:outline-none focus:border-purple-500 font-mono text-sm" value={pointsDistribution[parseInt(prod.productId!)] || 0} onChange={(e) => { const val = parseFloat(e.target.value); const pid = parseInt(prod.productId!); setPointsDistribution(prev => ({...prev, [pid]: isNaN(val) ? 0 : val})); }} step="0.01" />
                                                     </td>
-                                                    <td className="px-2 py-2 text-center">
-                                                        <button 
-                                                            onClick={() => handleRemoveFromModal(prod.id)}
-                                                            className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors"
-                                                            title="Quitar del pack"
-                                                        >
-                                                            <Trash2 className="w-4 h-4"/>
-                                                        </button>
-                                                    </td>
+                                                    <td className="px-2 py-2 text-center"><button onClick={() => handleRemoveFromModal(prod.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Quitar del pack"><Trash2 className="w-4 h-4"/></button></td>
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot className="bg-gray-50 font-bold text-gray-900 border-t border-gray-200">
-                                            <tr>
-                                                <td className="px-4 py-3">TOTALES</td>
-                                                <td className="px-4 py-3 text-right">S/ {currentModalPrice.toFixed(2)}</td>
-                                                <td className="px-4 py-3 text-right text-purple-600">
-                                                    {currentDistSum.toFixed(2)}
-                                                </td>
-                                                <td></td>
-                                            </tr>
-                                        </tfoot>
                                     </table>
-                                </div>
-                                
-                                <div className="mt-3 flex items-start gap-2 text-xs text-blue-700 bg-blue-50 p-3 rounded-xl border border-blue-100">
-                                    <Info className="w-4 h-4 mt-0.5 flex-shrink-0"/>
-                                    <span>
-                                        <b>Modo Flexible:</b> El pack se guardará con un total de <b>{currentDistSum.toFixed(2)}</b> puntos.
-                                    </span>
-                                </div>
-
-                                <div className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-100">
-                                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0"/>
-                                    <span>
-                                        <b>Nota:</b> Al guardar, los "Puntos Ganados" de estos productos se actualizarán en el catálogo general.
-                                    </span>
                                 </div>
                             </div>
                         </div>
-
                         <div className="p-6 border-t border-gray-100 flex gap-3 bg-gray-50 rounded-b-3xl">
                             <button onClick={() => setShowGlobalPackModal(false)} className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancelar</button>
-                            <button 
-                                onClick={handleSaveGlobalPack} 
-                                disabled={loading || modalProducts.length === 0} 
-                                className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                {loading ? 'Guardando...' : (editingPack ? 'Actualizar Pack' : 'Guardar Pack')}
-                            </button>
+                            <button onClick={handleSaveGlobalPack} disabled={loading || modalProducts.length === 0} className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all">{loading ? 'Guardando...' : (editingPack ? 'Actualizar Pack' : 'Guardar Pack')}</button>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* ✅ EL NUEVO MODAL DE PACKS (CREACIÓN PERSONALIZADA) */}
+            <CreatePackModal 
+                isOpen={showCreatePackModal}
+                onClose={() => setShowCreatePackModal(false)}
+                onSuccess={() => {
+                    setShowCreatePackModal(false);
+                    refreshAllData(); // Recargar la lista de packs y productos
+                    setSuccessMsg("Pack creado exitosamente 🎉");
+                    setTimeout(() => setSuccessMsg(null), 3000);
+                }}
+            />
 
         </div>
     );

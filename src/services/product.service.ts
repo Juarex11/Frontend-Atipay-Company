@@ -157,7 +157,7 @@ export const ProductService = {
     }
   },
 
-  async updateProduct(id: string | number, productData: Partial<Product> | FormData): Promise<Product> {
+async updateProduct(id: string | number, productData: Partial<Product> | FormData): Promise<Product> {
     try {
       let formData: FormData;
       
@@ -168,17 +168,28 @@ export const ProductService = {
         // Append all fields to formData
         Object.entries(productData).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
-            formData.append(key, value as string | Blob);
+            // Manejo especial para booleanos (Laravel prefiere 1/0)
+            if (typeof value === 'boolean') {
+                formData.append(key, value ? '1' : '0');
+            } else {
+                formData.append(key, value as string | Blob);
+            }
           }
         });
       }
 
+      // 🔥 ESTO ES LO QUE TE FALTABA 🔥
+      // Agregamos el "truco" para que Laravel sepa que es una actualización
+      if (!formData.has('_method')) {
+         formData.append('_method', 'PUT');
+      }
+
       // For Laravel, we need to use POST with _method=PUT for file uploads
       const response = await fetch(`${API_ROUTES.PRODUCTS.BASE}/${id}`, {
-        method: 'POST',
+        method: 'POST', // Usamos POST para enviar el archivo
         headers: {
           ...getAuthHeaders(),
-          // Let the browser set the content-type with the correct boundary
+          // NO poner Content-Type, el navegador lo pone solo
         },
         body: formData,
       });
@@ -188,7 +199,6 @@ export const ProductService = {
         let errorMessage = 'Error al actualizar el producto';
         
         if (errorData.message) {
-          // Translate common error messages to Spanish
           if (errorData.message.includes('The image field must not be greater than 2048 kilobytes')) {
             errorMessage = 'La imagen no debe pesar más de 2MB';
           } else if (errorData.message.includes('The image must be an image')) {

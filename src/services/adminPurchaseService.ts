@@ -20,8 +20,11 @@ export interface Product {
     points_earned?: number | string;
     stock?: number;
     image_path?: string;
+    image_url?: string;
     type?: string;
     description?: string;
+    is_visible?: boolean | number;
+    unit_type?: string; // ✅ Agregado para evitar error en CatalogPanel
 }
 
 export interface ManualPurchaseData {
@@ -67,6 +70,8 @@ export interface Pack {
     total_pack_points: number;
     status?: 'active' | 'inactive';
     products?: Product[];
+    image_path?: string;   // ✅ Nuevo
+    description?: string;  // ✅ Nuevo
 }
 
 // --- API CALLS ---
@@ -160,14 +165,41 @@ export const getPacks = async () => {
     return Array.isArray(data) ? data : [];
 };
 
-export const createPack = async (data: CreatePackData) => {
-    const response = await fetch(`${API_URL}/admin/packs`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data) });
+// ✅ FUNCIÓN ACTUALIZADA: Soporta FormData (Imágenes) y JSON (Legacy)
+export const createPack = async (data: any) => {
+    const token = localStorage.getItem('token');
+    
+    // Headers base (SIN Content-Type por defecto, para dejar que FormData lo ponga si es necesario)
+    const headers: Record<string, string> = { 
+        'Accept': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+    };
+
+    let body;
+
+    // Caso 1: Nuevo Modal (Envía FormData con imágenes)
+    if (data instanceof FormData) {
+        body = data;
+    } 
+    // Caso 2: Código Antiguo (Envía objeto JSON simple)
+    else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(data); // Enviamos el objeto tal cual como antes
+    }
+
+    const response = await fetch(`${API_URL}/admin/packs`, { 
+        method: 'POST', 
+        headers: headers, 
+        body: body 
+    });
+
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || result.message || 'Error crear pack');
     return result;
 };
 
-export const updatePack = async (id: number, data: CreatePackData) => {
+export const updatePack = async (id: number, data: any) => {
+    // Para update mantenemos JSON por ahora (modal editar antiguo)
     const response = await fetch(`${API_URL}/admin/packs/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || result.message || 'Error actualizar pack');
@@ -189,41 +221,129 @@ export const togglePackStatus = async (id: number) => {
 };
 
 // --- PRODUCTOS ---
-export const createProduct = async (data: { name: string; price: number; points: string | number; description?: string; image?: File | null }) => {
-    const token = localStorage.getItem('token'); 
-    const headers: Record<string, string> = { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` };
-    let body;
-    const integerPoints = parseInt(data.points.toString());
 
-    if (data.image) {
-        const formData = new FormData();
-        formData.append('name', data.name);
-        formData.append('price', data.price.toString());
-        formData.append('points', data.points.toString());
-        formData.append('points_earned', integerPoints.toString());
-        formData.append('description', data.description || '');
-        formData.append('stock', '100'); 
-        formData.append('category_id', '1'); 
-        formData.append('type', 'product'); 
-        formData.append('image', data.image);
-        body = formData;
+// ✅ FUNCIÓN ACTUALIZADA: Híbrido FormData/JSON para crear productos
+export const createProduct = async (data: any) => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = { 
+        'Accept': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+    };
+
+    let body: FormData;
+
+    // 1. Si ya viene como FormData (Nuevo Panel)
+    if (data instanceof FormData) {
+        body = data;
+        // Inyectamos valores por defecto si faltan
+        if (!body.has('stock')) body.append('stock', '100');
+        if (!body.has('type')) body.append('type', 'product');
+        if (!body.has('category_id')) body.append('category_id', '1');
     } else {
-        headers['Content-Type'] = 'application/json';
-        body = JSON.stringify({
-            name: data.name,
-            price: data.price,
-            points: data.points,
-            points_earned: integerPoints,
-            description: data.description || 'Producto creado desde admin',
-            stock: 100, category_id: 1, type: 'product'
+        // 2. Si viene como objeto JSON (Legacy o Quick Create)
+        const formData = new FormData();
+        Object.keys(data).forEach(key => {
+            const value = data[key];
+            if (value !== null && value !== undefined) {
+                if (key === 'image' && value instanceof File) {
+                    formData.append('image', value);
+                } else if (typeof value === 'boolean') {
+                    formData.append(key, value ? '1' : '0');
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
         });
+
+        // Valores por defecto
+        if (!formData.has('stock')) formData.append('stock', '100');
+        if (!formData.has('category_id')) formData.append('category_id', '1');
+        if (!formData.has('type')) formData.append('type', 'product');
+        if (!formData.has('points_earned') && formData.has('points')) {
+             formData.append('points_earned', formData.get('points') as string);
+        }
+
+        body = formData;
     }
 
-    const response = await fetch(`${API_URL}/products`, { method: 'POST', headers: headers, body: body });
+    const response = await fetch(`${API_URL}/products`, { 
+        method: 'POST', 
+        headers: headers, 
+        body: body 
+    });
+
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        if (errorData.errors) throw new Error(Object.values(errorData.errors).flat().join('\n')); 
+        if (errorData.errors) {
+             throw new Error(Object.values(errorData.errors).flat().join('\n')); 
+        }
         throw new Error(errorData.message || `Error del servidor`);
     }
+    
+    return await response.json();
+};
+
+export const createQuickProduct = async (name: string, price: number) => {
+    return createProduct({
+        name,
+        price,
+        points: (price / 3).toFixed(2), // Regla por defecto
+        description: 'Producto Rápido',
+        stock: 100,
+        type: 'product'
+    });
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const updateProduct = async (id: number, data: any) => {
+    const token = localStorage.getItem('token');
+    
+    // Headers: IMPORTANTE no poner Content-Type, el navegador lo pone solo
+    const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+
+    const formData = new FormData();
+
+    // 🔥 EL TRUCO PARA LARAVEL: Simular PUT
+    formData.append('_method', 'PUT'); 
+
+    // Llenar datos
+    Object.keys(data).forEach(key => {
+        const value = data[key];
+        if (value !== null && value !== undefined) {
+            // Solo agregar imagen si es un archivo nuevo
+            if (key === 'image') {
+                if (value instanceof File) {
+                    formData.append('image', value);
+                }
+            } 
+            else if (typeof value === 'boolean') {
+                formData.append(key, value ? '1' : '0');
+            }
+            else {
+                formData.append(key, String(value));
+            }
+        }
+    });
+
+    // Campos obligatorios por defecto si faltan
+    if (!formData.has('type')) formData.append('type', 'product');
+
+    const response = await fetch(`${API_URL}/products/${id}`, {
+        method: 'POST', // <--- SIEMPRE POST para enviar archivos con _method PUT
+        headers: headers,
+        body: formData
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.errors) {
+            throw new Error(Object.values(errorData.errors).flat().join('\n'));
+        }
+        throw new Error(errorData.message || 'Error al actualizar');
+    }
+
     return await response.json();
 };
