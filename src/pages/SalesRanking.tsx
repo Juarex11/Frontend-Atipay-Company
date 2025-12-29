@@ -39,7 +39,7 @@ const SalesRanking: React.FC = () => {
       // Ajusta la base URL si es necesario.
       const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
       const endpoint = activeTab === 'general' 
-        ? `${baseUrl}/ranking/general`
+        ? `${baseUrl}/affiliate/ranking`
         : `${baseUrl}/ranking/my-affiliates`;
 
       // 2. Obtener el token (AJUSTA LA CLAVE SI LA GUARDAS CON OTRO NOMBRE)
