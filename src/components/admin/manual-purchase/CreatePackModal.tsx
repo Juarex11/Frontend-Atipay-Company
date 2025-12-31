@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, CheckSquare, ArrowRight, Save, AlertTriangle, Package, Plus, Bookmark, Calculator, Info } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Search, CheckSquare, ArrowRight, Save, Package, Plus, Calculator, Image as ImageIcon, Camera, Trash2 } from 'lucide-react';
 import type { Product, ConversionRule } from '../../../services/adminPurchaseService';
-import { createPack, getProductsForSelector, getConversionRules, createConversionRule, createQuickProduct } from '../../../services/adminPurchaseService';
+import { createPack, getProductsForSelector, getConversionRules } from '../../../services/adminPurchaseService';
 
 interface CreatePackModalProps {
     isOpen: boolean;
@@ -9,29 +9,48 @@ interface CreatePackModalProps {
     onSuccess: () => void;
 }
 
+// Interfaz para los items personalizados que creas al vuelo
+interface CustomItem {
+    tempId: number;
+    name: string;
+    price: number;
+    points: number;
+    image: File | null;
+    imagePreview: string | null;
+}
+
 export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClose, onSuccess }) => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     
-    // Datos Generales
+    // --- DATOS GENERALES ---
     const [allProducts, setAllProducts] = useState<Product[]>([]);
     const [savedRules, setSavedRules] = useState<ConversionRule[]>([]);
     
-    // Estado Paso 1: Selección
+    // --- ESTADO PASO 1: SELECCIÓN ---
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [customItems, setCustomItems] = useState<CustomItem[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Estado Crear Producto Rápido
+    // --- ESTADO CREAR PRODUCTO RÁPIDO ---
     const [showQuickCreate, setShowQuickCreate] = useState(false);
-    const [newProdName, setNewProdName] = useState('');
-    const [newProdPrice, setNewProdPrice] = useState('');
+    const [newItemName, setNewItemName] = useState('');
+    const [newItemPrice, setNewItemPrice] = useState('');
+    const [newItemPoints, setNewItemPoints] = useState('');
+    const [newItemImage, setNewItemImage] = useState<File | null>(null);
+    const itemFileInputRef = useRef<HTMLInputElement>(null);
 
-    // Estado Paso 2: Calibración
+    // --- ESTADO PASO 2: CALIBRACIÓN Y DATOS PACK ---
     const [packName, setPackName] = useState('');
+    const [packDescription, setPackDescription] = useState('');
+    const [packImage, setPackImage] = useState<File | null>(null);
+    const packFileInputRef = useRef<HTMLInputElement>(null);
+
     const [selectedRuleId, setSelectedRuleId] = useState<string>(''); 
     const [ruleMoney, setRuleMoney] = useState<number>(3.00);
     const [rulePoints, setRulePoints] = useState<number>(1.00);
     const [manualPoints, setManualPoints] = useState<Record<number, number>>({});
+    const [customManualPoints, setCustomManualPoints] = useState<Record<number, number>>({});
 
     // Inicializar
     useEffect(() => {
@@ -39,8 +58,12 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
             initData();
             setStep(1);
             setSelectedIds([]);
+            setCustomItems([]);
             setPackName('');
+            setPackDescription('');
+            setPackImage(null);
             setManualPoints({});
+            setCustomManualPoints({});
             setShowQuickCreate(false);
         }
     }, [isOpen]);
@@ -54,16 +77,33 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
     };
 
     // --- LÓGICA PASO 1 ---
-    const handleQuickCreateProduct = async () => {
-        if (!newProdName || !newProdPrice) return alert("Llena nombre y precio");
-        setLoading(true);
-        try {
-            const newProduct = await createQuickProduct(newProdName, parseFloat(newProdPrice));
-            setAllProducts(prev => [newProduct, ...prev]);
-            setSelectedIds(prev => [...prev, newProduct.id]);
-            setNewProdName(''); setNewProdPrice(''); setShowQuickCreate(false);
-        } catch (error) { console.error(error); alert("Error al crear producto"); }
-        finally { setLoading(false); }
+    const handleAddCustomItem = () => {
+        if (!newItemName || !newItemPrice || !newItemPoints) return alert("Llena nombre, precio y puntos");
+        
+        const newItem: CustomItem = {
+            tempId: Date.now(),
+            name: newItemName,
+            price: parseFloat(newItemPrice),
+            points: parseFloat(newItemPoints),
+            image: newItemImage,
+            imagePreview: newItemImage ? URL.createObjectURL(newItemImage) : null
+        };
+
+        setCustomItems(prev => [...prev, newItem]);
+        
+        setNewItemName(''); 
+        setNewItemPrice(''); 
+        setNewItemPoints('');
+        setNewItemImage(null);
+        if (itemFileInputRef.current) itemFileInputRef.current.value = '';
+        setShowQuickCreate(false);
+    };
+
+    const handleRemoveCustomItem = (tempId: number) => {
+        setCustomItems(prev => prev.filter(item => item.tempId !== tempId));
+        const newPoints = { ...customManualPoints };
+        delete newPoints[tempId];
+        setCustomManualPoints(newPoints);
     };
 
     // --- LÓGICA PASO 2 ---
@@ -76,309 +116,263 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
         }
     };
 
-    const handleSaveNewRule = async () => {
-        const name = prompt("Nombre para guardar esta regla (Ej: Pack Verano):");
-        if (!name) return;
-        setLoading(true);
-        try {
-            const newRule = await createConversionRule({
-                name, amount_required: ruleMoney, points_awarded: rulePoints, is_active: true
-            });
-            const actualRule = (newRule as any).rule || newRule;
-            setSavedRules(prev => [...prev, actualRule]);
-            setSelectedRuleId(actualRule.id.toString());
-            alert("Regla guardada ✅");
-        } catch (e) { console.error(e); alert("Error al guardar regla"); } 
-        finally { setLoading(false); }
-    };
-
     // --- MATEMÁTICA ---
-    const selectedProducts = useMemo(() => allProducts.filter(p => selectedIds.includes(p.id)), [allProducts, selectedIds]);
-    const totalPrice = selectedProducts.reduce((sum, p) => sum + parseFloat(p.price.toString()), 0);
-    const targetTotalPoints = ruleMoney > 0 ? (totalPrice / ruleMoney) * rulePoints : 0;
+    const selectedExistingProducts = useMemo(() => allProducts.filter(p => selectedIds.includes(p.id)), [allProducts, selectedIds]);
+    
+    const totalExistingPrice = selectedExistingProducts.reduce((sum, p) => sum + parseFloat(p.price.toString()), 0);
+    const totalCustomPrice = customItems.reduce((sum, p) => sum + p.price, 0);
+    const totalPrice = totalExistingPrice + totalCustomPrice;
 
+    const targetTotalPoints = ruleMoney > 0 ? (totalPrice / ruleMoney) * rulePoints : 0;
     const getAutoPoints = (price: number) => (totalPrice === 0 ? 0 : (price / totalPrice) * targetTotalPoints);
 
-    const currentTotalPointsAssigned = selectedProducts.reduce((sum, p) => {
-        const points = manualPoints[p.id] !== undefined ? manualPoints[p.id] : getAutoPoints(parseFloat(p.price.toString()));
-        return sum + points;
-    }, 0);
+    const totalAssignedPoints = 
+        selectedExistingProducts.reduce((sum, p) => {
+            return sum + (manualPoints[p.id] !== undefined ? manualPoints[p.id] : getAutoPoints(parseFloat(p.price.toString())));
+        }, 0) +
+        customItems.reduce((sum, p) => {
+            return sum + (customManualPoints[p.tempId] !== undefined ? customManualPoints[p.tempId] : p.points);
+        }, 0);
 
-    const isBalanced = Math.abs(currentTotalPointsAssigned - targetTotalPoints) < 0.05;
+    const isBalanced = Math.abs(totalAssignedPoints - targetTotalPoints) < 0.05;
 
     // --- GUARDAR FINAL ---
     const handleSavePack = async () => {
         if (!packName.trim()) return alert("Falta el nombre del Pack");
-        if (!isBalanced && !confirm("⚠️ Los puntos no cuadran con la regla. ¿Guardar igual?")) return;
-        if (!confirm("⚠️ Se actualizarán los puntos de los productos en la base de datos. ¿Continuar?")) return;
+        if ((selectedIds.length === 0 && customItems.length === 0)) return alert("El pack está vacío");
+        
+        if (!isBalanced && !confirm(`⚠️ Los puntos actuales (${totalAssignedPoints.toFixed(2)}) no coinciden con la regla (${targetTotalPoints.toFixed(2)}). ¿Guardar de todas formas?`)) return;
 
         setLoading(true);
         try {
-            await createPack({
-                name: packName,
-                conversion_money: ruleMoney,
-                conversion_points: rulePoints,
-                products: selectedIds,
-                manual_distributions: manualPoints
+            const formData = new FormData();
+            
+            // 1. Datos Básicos
+            formData.append('name', packName);
+            formData.append('description', packDescription);
+            formData.append('conversion_money', ruleMoney.toString());
+            formData.append('conversion_points', rulePoints.toString());
+            formData.append('total_pack_price', totalPrice.toString());
+            formData.append('total_pack_points', totalAssignedPoints.toString());
+
+            if (packImage) {
+                formData.append('image', packImage);
+            }
+
+            // 2. Productos Existentes
+            selectedIds.forEach((id, index) => {
+                formData.append(`products[${index}]`, id.toString());
+                const p = selectedExistingProducts.find(p => p.id === id);
+                if (p) {
+                    const finalPts = manualPoints[id] !== undefined ? manualPoints[id] : getAutoPoints(parseFloat(p.price.toString()));
+                    formData.append(`manual_distributions[${id}]`, finalPts.toString());
+                }
             });
+
+            // 3. Productos Personalizados
+            customItems.forEach((item, index) => {
+                formData.append(`items[${index}][name]`, item.name);
+                formData.append(`items[${index}][price]`, item.price.toString());
+                
+                const finalPts = customManualPoints[item.tempId] !== undefined ? customManualPoints[item.tempId] : item.points;
+                formData.append(`items[${index}][points]`, finalPts.toString());
+
+                if (item.image) {
+                    formData.append(`items[${index}][image]`, item.image);
+                }
+            });
+
+            // 🔥 SOLUCIÓN ERROR 1: Usamos 'as any' para evitar conflicto de tipos si el servicio no está actualizado
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await createPack(formData as any);
+            
             onSuccess();
             onClose();
-        } catch (error: any) { alert("Error: " + (error.message || "Error desconocido")); } 
-        finally { setLoading(false); }
-    };
-
-    const handleManualPointChange = (id: number, val: string) => {
-        const num = parseFloat(val);
-        setManualPoints(prev => ({ ...prev, [id]: isNaN(num) ? 0 : num }));
+        } catch (error) { 
+            // 🔥 SOLUCIÓN ERROR 2: Quitamos ': any' y casteamos adentro
+            console.error(error);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
+            alert("Error: " + (err.message || "Error desconocido")); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            {/* CAMBIO CLAVE: max-h-[90vh] y h-auto para que se ajuste al contenido */}
-            <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] h-auto flex flex-col shadow-2xl animate-in zoom-in-95 overflow-hidden">
+            <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] h-auto flex flex-col shadow-2xl animate-in zoom-in-95 overflow-hidden border border-gray-100">
                 
-                {/* Header Compacto */}
+                {/* HEADER */}
                 <div className="px-6 py-4 border-b bg-white flex justify-between items-center shrink-0">
                     <div>
                         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <Package className="w-5 h-5 text-blue-600"/> 
-                            {step === 1 ? 'Paso 1: Selección de Productos' : 'Paso 2: Reglas y Distribución'}
+                            <Package className="w-5 h-5 text-purple-600"/> 
+                            {step === 1 ? 'Paso 1: Configurar Contenido' : 'Paso 2: Detalles y Reglas'}
                         </h2>
                     </div>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-400"/></button>
                 </div>
 
-                {/* Body Scrollable */}
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                {/* BODY SCROLLABLE */}
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 custom-scrollbar">
                     
-                    {/* === PASO 1: SELECCIÓN === */}
                     {step === 1 && (
-                        <div className="space-y-4">
-                            <div className="flex gap-2">
+                        <div className="space-y-6">
+                            {/* BARRA DE ACCIÓN */}
+                            <div className="flex flex-col md:flex-row gap-3">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Buscar producto..." 
-                                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-                                        value={searchTerm}
-                                        onChange={e => setSearchTerm(e.target.value)}
-                                    />
+                                    <input type="text" placeholder="Buscar en catálogo..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                                 </div>
-                                <button 
-                                    onClick={() => setShowQuickCreate(!showQuickCreate)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-2 shadow-sm ${showQuickCreate ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}
-                                >
-                                    <Plus className="w-4 h-4"/> {showQuickCreate ? 'Cancelar' : 'Nuevo Producto'}
+                                <button onClick={() => setShowQuickCreate(!showQuickCreate)} className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-2 shadow-sm ${showQuickCreate ? 'bg-purple-900 text-white border-purple-900' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'}`}>
+                                    <Plus className="w-4 h-4"/> {showQuickCreate ? 'Cerrar Creador' : 'Crear Item Custom'}
                                 </button>
                             </div>
 
-                            {/* Panel Crear Rápido */}
+                            {/* PANEL CREACIÓN RÁPIDA */}
                             {showQuickCreate && (
-                                <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm animate-in slide-in-from-top-2">
-                                    <div className="flex gap-3 items-end">
-                                        <div className="flex-1 space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500 uppercase">Nombre</label>
-                                            <input value={newProdName} onChange={e=>setNewProdName(e.target.value)} className="w-full p-2 rounded-lg border text-sm focus:ring-1 focus:ring-blue-500" placeholder="Ej: Coca Cola 3L" autoFocus/>
+                                <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-lg animate-in slide-in-from-top-2 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"/>
+                                    <h4 className="text-xs font-bold text-purple-800 uppercase mb-3 flex items-center gap-2"><Package className="w-3 h-3"/> Nuevo Item Personalizado</h4>
+                                    
+                                    <div className="flex flex-col md:flex-row gap-4 items-start">
+                                        <div onClick={() => itemFileInputRef.current?.click()} className={`w-20 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0 ${newItemImage ? 'border-purple-500 bg-purple-50' : 'border-gray-300 hover:border-purple-400'}`}>
+                                            <input ref={itemFileInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setNewItemImage(e.target.files[0])} />
+                                            {newItemImage ? <img src={URL.createObjectURL(newItemImage)} className="w-full h-full object-cover rounded-lg" /> : <Camera className="w-6 h-6 text-gray-400"/>}
                                         </div>
-                                        <div className="w-28 space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500 uppercase">Precio</label>
-                                            <input type="number" value={newProdPrice} onChange={e=>setNewProdPrice(e.target.value)} className="w-full p-2 rounded-lg border text-sm focus:ring-1 focus:ring-blue-500" placeholder="0.00" />
+
+                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 w-full">
+                                            <div className="md:col-span-3">
+                                                <input value={newItemName} onChange={e=>setNewItemName(e.target.value)} className="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Nombre (Ej: Botella)" />
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2 text-xs font-bold text-gray-400">S/</span>
+                                                <input type="number" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} className="w-full pl-8 pr-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Precio" />
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2 text-xs font-bold text-amber-500">Pts</span>
+                                                <input type="number" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} className="w-full pl-8 pr-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Puntos" />
+                                            </div>
+                                            <button onClick={handleAddCustomItem} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 shadow-md">Agregar al Pack</button>
                                         </div>
-                                        <button onClick={handleQuickCreateProduct} disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm h-[38px]">
-                                            Crear
-                                        </button>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Grid Productos */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {allProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => {
-                                    const isSelected = selectedIds.includes(product.id);
-                                    return (
-                                        <div 
-                                            key={product.id} 
-                                            onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i=>i!==product.id) : [...prev, product.id])}
-                                            className={`group p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center select-none ${isSelected ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}`}
-                                        >
-                                            <div>
-                                                <p className={`font-bold text-sm line-clamp-1 ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{product.name}</p>
-                                                <p className="text-xs text-gray-500 font-mono mt-0.5">S/ {parseFloat(product.price.toString()).toFixed(2)}</p>
-                                            </div>
-                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300 group-hover:border-blue-300'}`}>
-                                                {isSelected && <CheckSquare className="w-3.5 h-3.5 text-white"/>}
-                                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* ITEMS PERSONALIZADOS */}
+                                {customItems.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase">Items Personalizados ({customItems.length})</h3>
+                                        <div className="space-y-2">
+                                            {customItems.map(item => (
+                                                <div key={item.tempId} className="flex items-center gap-3 bg-purple-50 p-2 pr-3 rounded-xl border border-purple-100">
+                                                    <div className="w-10 h-10 bg-white rounded-lg border border-purple-100 overflow-hidden flex-shrink-0">
+                                                        {item.imagePreview ? <img src={item.imagePreview} className="w-full h-full object-cover"/> : <Package className="w-full h-full p-2 text-purple-200"/>}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-purple-900 text-sm truncate">{item.name}</p>
+                                                        <p className="text-xs text-purple-600">S/ {item.price.toFixed(2)} • <span className="font-bold">{item.points} pts</span></p>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveCustomItem(item.tempId)} className="p-1.5 text-purple-400 hover:text-red-500 hover:bg-white rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                )}
+
+                                {/* CATÁLOGO GENERAL */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase">Catálogo General</h3>
+                                    <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2">
+                                        {allProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => {
+                                            const isSelected = selectedIds.includes(product.id);
+                                            return (
+                                                <div key={product.id} onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i=>i!==product.id) : [...prev, product.id])} className={`cursor-pointer p-2 rounded-xl border flex items-center gap-3 transition-all ${isSelected ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-300'}`}>
+                                                    <div className="w-8 h-8 rounded bg-gray-100 overflow-hidden shrink-0">
+                                                        {product.image_url ? <img src={product.image_url} className="w-full h-full object-cover"/> : <Package className="w-full h-full p-2 text-gray-300"/>}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`font-bold text-xs truncate ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{product.name}</p>
+                                                        <p className="text-[10px] text-gray-500">S/ {Number(product.price).toFixed(2)}</p>
+                                                    </div>
+                                                    {isSelected && <CheckSquare className="w-4 h-4 text-blue-600"/>}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* === PASO 2: CALIBRACIÓN === */}
                     {step === 2 && (
                         <div className="space-y-6">
-                            
-                            {/* Card de Configuración (Limpia y Ordenada) */}
-                            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="text-sm font-bold text-gray-900">Configuración del Pack</h3>
-                                        <p className="text-xs text-gray-500">Define las reglas generales.</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
-                                        <span className="text-[10px] font-bold text-gray-500 px-2 uppercase">Cargar Regla:</span>
-                                        <select 
-                                            className="bg-transparent text-sm font-medium text-gray-700 outline-none cursor-pointer pr-2"
-                                            value={selectedRuleId}
-                                            onChange={(e) => handleRuleSelect(e.target.value)}
-                                        >
-                                            <option value="">-- Personalizada --</option>
-                                            {savedRules.map(r => (
-                                                <option key={r.id} value={r.id}>{r.name}</option>
-                                            ))}
-                                        </select>
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div onClick={() => packFileInputRef.current?.click()} className={`w-32 h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden shrink-0 ${packImage ? 'border-purple-500' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                    <input ref={packFileInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setPackImage(e.target.files[0])} />
+                                    {packImage ? <img src={URL.createObjectURL(packImage)} className="w-full h-full object-cover" /> : <div className="text-center"><ImageIcon className="w-6 h-6 text-gray-400 mx-auto mb-1"/><span className="text-[10px] text-gray-500 font-bold">FOTO PACK</span></div>}
+                                </div>
+                                <div className="flex-1 space-y-3">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2"><label className="text-xs font-bold text-gray-500 uppercase">Nombre</label><input value={packName} onChange={e => setPackName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold" placeholder="Ej: Pack Verano" /></div>
+                                        <div className="col-span-2"><label className="text-xs font-bold text-gray-500 uppercase">Descripción</label><textarea value={packDescription} onChange={e => setPackDescription(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500 outline-none h-16 resize-none" placeholder="Contenido..." /></div>
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                                    <div className="md:col-span-6 space-y-1.5">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Nombre del Pack</label>
-                                        <input value={packName} onChange={e => setPackName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Ej: Pack Verano 2025" />
-                                    </div>
-                                    <div className="md:col-span-3 space-y-1.5">
-                                        <label className="text-xs font-bold text-blue-600 uppercase">Por cada (S/)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-gray-400 text-xs font-bold">S/</span>
-                                            <input type="number" value={ruleMoney} onChange={e => {setRuleMoney(parseFloat(e.target.value)); setSelectedRuleId('')}} className="w-full pl-8 pr-3 py-2 rounded-lg border border-blue-200 bg-blue-50/50 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-                                        </div>
-                                    </div>
-                                    <div className="md:col-span-3 space-y-1.5">
-                                        <label className="text-xs font-bold text-green-600 uppercase">Gana (Pts)</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-gray-400 text-xs font-bold">P</span>
-                                            <input type="number" value={rulePoints} onChange={e => {setRulePoints(parseFloat(e.target.value)); setSelectedRuleId('')}} className="w-full pl-8 pr-3 py-2 rounded-lg border border-green-200 bg-green-50/50 text-sm font-bold text-gray-800 focus:ring-2 focus:ring-green-500 outline-none transition-all" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {!selectedRuleId && ruleMoney > 0 && (
-                                    <button onClick={handleSaveNewRule} disabled={loading} className="mt-3 text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 hover:underline">
-                                        <Bookmark className="w-3 h-3"/> Guardar esta regla para usarla después
-                                    </button>
-                                )}
                             </div>
 
-                            {/* Tabla de Distribución */}
-                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                                <div className="px-5 py-3 bg-gray-50/50 border-b border-gray-100 flex justify-between items-center">
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
-                                        <Calculator className="w-3 h-3"/> Distribución de Puntos
-                                    </h4>
-                                    <div className="flex gap-4 text-xs">
-                                        <span className="text-gray-500">Total Pack: <strong className="text-gray-900">S/ {totalPrice.toFixed(2)}</strong></span>
-                                        <span className="text-blue-600 bg-blue-50 px-2 rounded-md border border-blue-100">Meta: <strong>{targetTotalPoints.toFixed(2)} pts</strong></span>
-                                    </div>
+                            {/* REGLAS */}
+                            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2"><Calculator className="w-4 h-4"/> Regla de Conversión</h3>
+                                    <select className="bg-white border border-blue-200 text-xs font-bold text-blue-700 rounded-lg px-2 py-1 outline-none" value={selectedRuleId} onChange={(e) => handleRuleSelect(e.target.value)}>
+                                        <option value="">-- Personalizada --</option>
+                                        {savedRules.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
                                 </div>
-                                
+                                <div className="flex gap-4 items-center">
+                                    <div className="flex-1 bg-white p-2 rounded-lg border border-blue-100 flex items-center justify-between px-3"><span className="text-xs font-bold text-gray-500">POR CADA</span><div className="flex items-center gap-1"><span className="text-gray-400 font-bold text-xs">S/</span><input type="number" value={ruleMoney} onChange={e => setRuleMoney(parseFloat(e.target.value))} className="w-16 text-right font-bold text-gray-800 outline-none"/></div></div>
+                                    <ArrowRight className="w-4 h-4 text-blue-300"/>
+                                    <div className="flex-1 bg-white p-2 rounded-lg border border-green-100 flex items-center justify-between px-3"><span className="text-xs font-bold text-gray-500">GANA</span><div className="flex items-center gap-1"><input type="number" value={rulePoints} onChange={e => setRulePoints(parseFloat(e.target.value))} className="w-16 text-right font-bold text-green-600 outline-none"/><span className="text-green-500 font-bold text-xs">Pts</span></div></div>
+                                </div>
+                            </div>
+
+                            {/* TABLA */}
+                            <div className="border rounded-xl overflow-hidden">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="text-gray-400 font-medium text-xs border-b border-gray-100">
-                                        <tr>
-                                            <th className="px-5 py-3 font-semibold">Producto</th>
-                                            <th className="px-5 py-3 font-semibold text-right">Precio</th>
-                                            <th className="px-5 py-3 font-semibold text-right">Prop. (%)</th>
-                                            <th className="px-5 py-3 font-semibold text-right w-36">Puntos Asignados</th>
-                                        </tr>
+                                    <thead className="bg-gray-50 text-xs font-bold text-gray-400 uppercase border-b">
+                                        <tr><th className="px-4 py-3">Producto</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Pts. Calc</th><th className="px-4 py-3 text-right w-32">Final</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {selectedProducts.map(p => {
+                                        {selectedExistingProducts.map(p => {
                                             const price = parseFloat(p.price.toString());
-                                            const percent = totalPrice > 0 ? (price / totalPrice) * 100 : 0;
                                             const autoVal = getAutoPoints(price);
                                             const manualVal = manualPoints[p.id];
-                                            const finalVal = manualVal !== undefined ? manualVal : autoVal;
-                                            const isEdited = manualVal !== undefined;
-
-                                            return (
-                                                <tr key={p.id} className="hover:bg-gray-50/80 transition-colors">
-                                                    <td className="px-5 py-3 font-medium text-gray-700">{p.name}</td>
-                                                    <td className="px-5 py-3 text-right text-gray-500 font-mono text-xs">S/ {price.toFixed(2)}</td>
-                                                    <td className="px-5 py-3 text-right text-gray-400 text-xs">{percent.toFixed(1)}%</td>
-                                                    <td className="px-5 py-3 text-right">
-                                                        <div className="flex items-center justify-end gap-2 relative">
-                                                            <input 
-                                                                type="number" 
-                                                                className={`w-20 text-right text-sm border rounded-lg py-1 px-2 font-bold outline-none transition-all ${isEdited ? 'border-orange-300 text-orange-700 bg-orange-50 ring-1 ring-orange-200' : 'border-gray-200 text-gray-600 focus:border-blue-400 focus:ring-1 focus:ring-blue-200'}`}
-                                                                value={finalVal.toFixed(2)}
-                                                                onChange={(e) => handleManualPointChange(p.id, e.target.value)}
-                                                                onBlur={() => {
-                                                                    if (manualPoints[p.id] === undefined || isNaN(manualPoints[p.id])) {
-                                                                        const newMap = {...manualPoints}; delete newMap[p.id]; setManualPoints(newMap);
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
+                                            return (<tr key={`exist-${p.id}`} className="hover:bg-gray-50"><td className="px-4 py-2 font-medium text-gray-700">{p.name}</td><td className="px-4 py-2 text-right text-gray-500 text-xs">S/ {price.toFixed(2)}</td><td className="px-4 py-2 text-right text-gray-400 text-xs">{autoVal.toFixed(2)}</td><td className="px-4 py-2 text-right"><input type="number" className="w-20 text-right border rounded px-1 py-0.5 text-xs font-bold focus:border-blue-500 outline-none" value={(manualVal !== undefined ? manualVal : autoVal).toFixed(2)} onChange={e => setManualPoints({...manualPoints, [p.id]: parseFloat(e.target.value)})}/></td></tr>);
+                                        })}
+                                        {customItems.map(p => {
+                                            const manualVal = customManualPoints[p.tempId];
+                                            return (<tr key={`custom-${p.tempId}`} className="hover:bg-purple-50 bg-purple-50/30"><td className="px-4 py-2 font-medium text-purple-900 flex items-center gap-2"><Package className="w-3 h-3 text-purple-400"/> {p.name}</td><td className="px-4 py-2 text-right text-gray-500 text-xs">S/ {p.price.toFixed(2)}</td><td className="px-4 py-2 text-right text-gray-400 text-xs">{p.points.toFixed(2)}</td><td className="px-4 py-2 text-right"><input type="number" className="w-20 text-right border rounded px-1 py-0.5 text-xs font-bold text-purple-700 border-purple-200 focus:border-purple-500 outline-none" value={(manualVal !== undefined ? manualVal : p.points).toFixed(2)} onChange={e => setCustomManualPoints({...customManualPoints, [p.tempId]: parseFloat(e.target.value)})}/></td></tr>);
                                         })}
                                     </tbody>
-                                    
-                                    {/* Footer de Tabla (Totales) */}
-                                    <tfoot className="bg-gray-50 border-t border-gray-200">
-                                        <tr>
-                                            <td colSpan={3} className="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wide">Suma Total:</td>
-                                            <td className="px-5 py-3 text-right">
-                                                <div className={`inline-flex items-center gap-2 font-bold text-sm px-3 py-1 rounded-lg border ${isBalanced ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                                                    {currentTotalPointsAssigned.toFixed(2)}
-                                                    {!isBalanced && <AlertTriangle className="w-3.5 h-3.5"/>}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                    <tfoot className="bg-gray-50 border-t">
+                                        <tr><td className="px-4 py-2 font-bold text-gray-600 text-xs uppercase">Totales</td><td className="px-4 py-2 text-right font-bold text-gray-900">S/ {totalPrice.toFixed(2)}</td><td className="px-4 py-2 text-right font-bold text-blue-600">Meta: {targetTotalPoints.toFixed(2)}</td><td className="px-4 py-2 text-right"><span className={`font-bold px-2 py-0.5 rounded ${isBalanced ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}`}>{totalAssignedPoints.toFixed(2)}</span></td></tr>
                                     </tfoot>
                                 </table>
                             </div>
-
-                            {/* Alerta de Desbalance */}
-                            {!isBalanced && (
-                                <div className="flex items-start gap-3 bg-red-50 border border-red-100 p-3 rounded-xl">
-                                    <Info className="w-5 h-5 text-red-500 shrink-0 mt-0.5"/>
-                                    <div className="text-xs text-red-700">
-                                        <strong className="block mb-0.5">La suma no coincide</strong>
-                                        Los puntos asignados manualmente suman <strong>{currentTotalPointsAssigned.toFixed(2)}</strong>, pero según la regla del pack deberían ser <strong>{targetTotalPoints.toFixed(2)}</strong>. Por favor ajusta los valores.
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
 
-                {/* Footer Fijo */}
                 <div className="p-5 border-t bg-white flex justify-between items-center shrink-0">
-                    {step === 2 ? (
-                        <button onClick={() => setStep(1)} className="px-5 py-2.5 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm hover:bg-gray-50 hover:text-gray-800 transition-colors">
-                            Atrás
-                        </button>
-                    ) : <div/>}
-
+                    {step === 2 && <button onClick={() => setStep(1)} className="px-5 py-2 rounded-xl border font-bold text-gray-600 text-sm hover:bg-gray-50">Atrás</button>}
                     {step === 1 ? (
-                        <button 
-                            onClick={() => selectedIds.length > 0 ? setStep(2) : alert("Selecciona al menos 1 producto")} 
-                            className="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-black flex items-center gap-2 shadow-lg shadow-gray-200 transition-all"
-                        >
-                            Siguiente <ArrowRight className="w-4 h-4"/>
-                        </button>
+                        <div className="flex justify-end w-full"><button onClick={() => (selectedIds.length > 0 || customItems.length > 0) ? setStep(2) : alert("Selecciona al menos 1 producto")} className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-black shadow-lg">Siguiente <ArrowRight className="w-4 h-4 inline ml-1"/></button></div>
                     ) : (
-                        <button 
-                            onClick={handleSavePack} 
-                            disabled={loading}
-                            className={`px-8 py-2.5 rounded-xl font-bold text-white text-sm flex items-center gap-2 shadow-lg transition-all ${isBalanced ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'bg-red-500 hover:bg-red-600 shadow-red-200'}`}
-                        >
-                            {loading ? 'Guardando...' : <><Save className="w-4 h-4"/> Guardar Pack</>}
-                        </button>
+                        <button onClick={handleSavePack} disabled={loading} className={`px-6 py-2 rounded-xl font-bold text-white text-sm flex items-center gap-2 shadow-lg ml-auto ${isBalanced ? 'bg-green-600 hover:bg-green-700' : 'bg-red-500 hover:bg-red-600'}`}>{loading ? 'Guardando...' : <><Save className="w-4 h-4"/> Guardar Pack</>}</button>
                     )}
                 </div>
             </div>
