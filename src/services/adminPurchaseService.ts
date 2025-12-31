@@ -1,5 +1,4 @@
-// src/services/adminPurchaseService.ts
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const API_URL = 'http://127.0.0.1:8000/api'; 
 
 const getAuthHeaders = () => {
@@ -24,7 +23,7 @@ export interface Product {
     type?: string;
     description?: string;
     is_visible?: boolean | number;
-    unit_type?: string; // ✅ Agregado para evitar error en CatalogPanel
+    unit_type?: string; 
 }
 
 export interface ManualPurchaseData {
@@ -70,11 +69,11 @@ export interface Pack {
     total_pack_points: number;
     status?: 'active' | 'inactive';
     products?: Product[];
-    image_path?: string;   // ✅ Nuevo
-    description?: string;  // ✅ Nuevo
+    image_path?: string;
+    description?: string;
 }
 
-// --- API CALLS ---
+// --- API CALLS: USUARIOS Y PRODUCTOS ---
 
 export const getUsersForSelector = async () => {
     const response = await fetch(`${API_URL}/users?limit=1000&status=active`, { method: 'GET', headers: getAuthHeaders() });
@@ -84,11 +83,13 @@ export const getUsersForSelector = async () => {
 };
 
 export const getProductsForSelector = async () => {
-    const response = await fetch(`${API_URL}/products?status=active`, { method: 'GET', headers: getAuthHeaders() });
+    const response = await fetch(`${API_URL}/products?status=active&show_hidden=1`, { method: 'GET', headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Error productos');
     const data = await response.json();
     return Array.isArray(data) ? data : (data.data || []);
 };
+
+// --- VENTAS ---
 
 export const storeManualPurchase = async (data: ManualPurchaseData) => {
     const formData = new FormData();
@@ -104,9 +105,14 @@ export const storeManualPurchase = async (data: ManualPurchaseData) => {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Accept': 'application/json' },
         body: formData,
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Error venta');
-    return result;
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        let msg = errorData.message || 'Error venta';
+        if(msg.includes('too large') || msg.includes('2048')) msg = '⚠️ La imagen es muy pesada (Máx 2MB).';
+        throw new Error(msg);
+    }
+    return await response.json();
 };
 
 export const annulPurchase = async (purchaseId: number) => {
@@ -116,26 +122,53 @@ export const annulPurchase = async (purchaseId: number) => {
     return data;
 };
 
-export const assignPrivatePack = async (data: PrivatePackData) => {
+// --- PACKS PRIVADOS ---
+
+// En src/services/adminPurchaseService.ts
+
+export const assignPrivatePack = async (data: { 
+    user_id: number, 
+    name: string, 
+    price: number, 
+    points: number, 
+    description: string,
+    image?: File | null // ✅ Aceptamos imagen
+}) => {
+    // Usamos FormData para poder enviar la imagen
     const formData = new FormData();
     formData.append('user_id', data.user_id.toString());
     formData.append('name', data.name);
     formData.append('price', data.price.toString());
-    formData.append('points', data.points.toString());
+    formData.append('points_earned', data.points.toString()); // Asegúrate de que el backend espere 'points_earned' o 'points'
     formData.append('description', data.description);
-    if (data.image) formData.append('image', data.image);
+    
+    // Estos campos ayudan al backend a identificarlo como pack privado
+    formData.append('type', 'pack'); 
+    formData.append('stock', '1');
+    formData.append('is_visible', '1');
 
-    const response = await fetch(`${API_URL}/admin/products/assign-private`, { 
-        method: 'POST', 
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Accept': 'application/json' }, 
-        body: formData 
+    if (data.image) {
+        formData.append('image', data.image);
+    }
+
+    const response = await fetch(`${API_URL}/products`, { // Creamos el pack como un producto especial
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            // NOTA: No ponemos 'Content-Type': 'application/json' porque FormData lo gestiona automáticamente
+        },
+        body: formData
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Error pack privado');
-    return result;
+
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || result.message || 'Error al asignar pack privado');
+    }
+    return await response.json();
 };
 
-// --- REGLAS ---
+// --- REGLAS DE CONVERSIÓN ---
+
 export const getConversionRules = async (onlyActive = true) => {
     const endpoint = onlyActive ? '/admin/conversion-rules/active' : '/admin/conversion-rules';
     const response = await fetch(`${API_URL}${endpoint}`, { method: 'GET', headers: getAuthHeaders() });
@@ -143,48 +176,39 @@ export const getConversionRules = async (onlyActive = true) => {
     return Array.isArray(data) ? data : [];
 };
 
+// ✅ ESTA ES LA FUNCIÓN QUE FALTABA
 export const createConversionRule = async (data: Partial<ConversionRule>) => {
-    const response = await fetch(`${API_URL}/admin/conversion-rules`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data) });
-    return response.json();
-};
-
-export const updateConversionRule = async (id: number, data: Partial<ConversionRule>) => {
-    const response = await fetch(`${API_URL}/admin/conversion-rules/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data) });
-    return response.json();
-};
-
-export const deleteConversionRule = async (id: number) => {
-    const response = await fetch(`${API_URL}/admin/conversion-rules/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-    return response.json();
+    const response = await fetch(`${API_URL}/admin/conversion-rules`, { 
+        method: 'POST', 
+        headers: getAuthHeaders(), 
+        body: JSON.stringify(data) 
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Error al crear la regla');
+    return result;
 };
 
 // --- PACKS ---
+
 export const getPacks = async () => {
     const response = await fetch(`${API_URL}/admin/packs`, { method: 'GET', headers: getAuthHeaders() });
     const data = await response.json();
     return Array.isArray(data) ? data : [];
 };
 
-// ✅ FUNCIÓN ACTUALIZADA: Soporta FormData (Imágenes) y JSON (Legacy)
 export const createPack = async (data: any) => {
     const token = localStorage.getItem('token');
-    
-    // Headers base (SIN Content-Type por defecto, para dejar que FormData lo ponga si es necesario)
     const headers: Record<string, string> = { 
         'Accept': 'application/json', 
         'Authorization': `Bearer ${token}` 
     };
 
     let body;
-
-    // Caso 1: Nuevo Modal (Envía FormData con imágenes)
     if (data instanceof FormData) {
         body = data;
-    } 
-    // Caso 2: Código Antiguo (Envía objeto JSON simple)
-    else {
+    } else {
         headers['Content-Type'] = 'application/json';
-        body = JSON.stringify(data); // Enviamos el objeto tal cual como antes
+        body = JSON.stringify(data); 
     }
 
     const response = await fetch(`${API_URL}/admin/packs`, { 
@@ -193,36 +217,25 @@ export const createPack = async (data: any) => {
         body: body 
     });
 
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || result.message || 'Error crear pack');
-    return result;
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        let msg = result.error || result.message || 'Error crear pack';
+        if (result.errors) msg = Object.values(result.errors).flat().join('\n');
+        if (msg.includes('too large') || msg.includes('2048')) msg = '⚠️ La imagen es muy pesada (Máx 2MB).';
+        throw new Error(msg);
+    }
+    return await response.json();
 };
 
 export const updatePack = async (id: number, data: any) => {
-    // Para update mantenemos JSON por ahora (modal editar antiguo)
     const response = await fetch(`${API_URL}/admin/packs/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || result.message || 'Error actualizar pack');
     return result;
 };
 
-export const deletePack = async (id: number) => {
-    const response = await fetch(`${API_URL}/admin/packs/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Error eliminar pack');
-    return result;
-};
-
-export const togglePackStatus = async (id: number) => {
-    const response = await fetch(`${API_URL}/admin/packs/${id}/toggle`, { method: 'PATCH', headers: getAuthHeaders() });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || 'Error cambiar estado');
-    return result;
-};
-
 // --- PRODUCTOS ---
 
-// ✅ FUNCIÓN ACTUALIZADA: Híbrido FormData/JSON para crear productos
 export const createProduct = async (data: any) => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = { 
@@ -232,15 +245,12 @@ export const createProduct = async (data: any) => {
 
     let body: FormData;
 
-    // 1. Si ya viene como FormData (Nuevo Panel)
     if (data instanceof FormData) {
         body = data;
-        // Inyectamos valores por defecto si faltan
         if (!body.has('stock')) body.append('stock', '100');
         if (!body.has('type')) body.append('type', 'product');
         if (!body.has('category_id')) body.append('category_id', '1');
     } else {
-        // 2. Si viene como objeto JSON (Legacy o Quick Create)
         const formData = new FormData();
         Object.keys(data).forEach(key => {
             const value = data[key];
@@ -254,15 +264,12 @@ export const createProduct = async (data: any) => {
                 }
             }
         });
-
-        // Valores por defecto
         if (!formData.has('stock')) formData.append('stock', '100');
         if (!formData.has('category_id')) formData.append('category_id', '1');
         if (!formData.has('type')) formData.append('type', 'product');
         if (!formData.has('points_earned') && formData.has('points')) {
              formData.append('points_earned', formData.get('points') as string);
         }
-
         body = formData;
     }
 
@@ -274,12 +281,15 @@ export const createProduct = async (data: any) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        let errorMessage = errorData.message || 'Error del servidor';
         if (errorData.errors) {
-             throw new Error(Object.values(errorData.errors).flat().join('\n')); 
+             errorMessage = Object.values(errorData.errors).flat().join('\n'); 
         }
-        throw new Error(errorData.message || `Error del servidor`);
+        if (errorMessage.includes('greater than 2048') || errorMessage.includes('too large')) {
+            throw new Error('⚠️ La imagen es muy pesada (Máx 2MB).');
+        }
+        throw new Error(errorMessage);
     }
-    
     return await response.json();
 };
 
@@ -287,7 +297,7 @@ export const createQuickProduct = async (name: string, price: number) => {
     return createProduct({
         name,
         price,
-        points: (price / 3).toFixed(2), // Regla por defecto
+        points: (price / 3).toFixed(2), 
         description: 'Producto Rápido',
         stock: 100,
         type: 'product'
@@ -297,27 +307,19 @@ export const createQuickProduct = async (name: string, price: number) => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const updateProduct = async (id: number, data: any) => {
     const token = localStorage.getItem('token');
-    
-    // Headers: IMPORTANTE no poner Content-Type, el navegador lo pone solo
     const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Authorization': `Bearer ${token}`
     };
 
     const formData = new FormData();
-
-    // 🔥 EL TRUCO PARA LARAVEL: Simular PUT
     formData.append('_method', 'PUT'); 
 
-    // Llenar datos
     Object.keys(data).forEach(key => {
         const value = data[key];
         if (value !== null && value !== undefined) {
-            // Solo agregar imagen si es un archivo nuevo
             if (key === 'image') {
-                if (value instanceof File) {
-                    formData.append('image', value);
-                }
+                if (value instanceof File) formData.append('image', value);
             } 
             else if (typeof value === 'boolean') {
                 formData.append(key, value ? '1' : '0');
@@ -328,22 +330,45 @@ export const updateProduct = async (id: number, data: any) => {
         }
     });
 
-    // Campos obligatorios por defecto si faltan
     if (!formData.has('type')) formData.append('type', 'product');
 
     const response = await fetch(`${API_URL}/products/${id}`, {
-        method: 'POST', // <--- SIEMPRE POST para enviar archivos con _method PUT
+        method: 'POST', 
         headers: headers,
         body: formData
     });
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        if (errorData.errors) {
-            throw new Error(Object.values(errorData.errors).flat().join('\n'));
-        }
+        if (errorData.errors) throw new Error(Object.values(errorData.errors).flat().join('\n'));
         throw new Error(errorData.message || 'Error al actualizar');
     }
 
     return await response.json();
+};
+//  (Para eliminar)
+export const deleteProduct = async (id: number) => {
+    const response = await fetch(`${API_URL}/products/${id}`, { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
+    });
+    
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || result.message || 'Error al eliminar producto');
+    }
+    return await response.json();
+};
+export const deletePack = async (id: number) => {
+    // Usamos la ruta /admin/packs/{id} asumiendo que sigue el estándar REST de tu backend
+    const response = await fetch(`${API_URL}/admin/packs/${id}`, { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
+    });
+    
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || result.message || 'Error al eliminar pack');
+    }
+    return await response.json(); // O simplemente return true si tu API no devuelve JSON al borrar
 };

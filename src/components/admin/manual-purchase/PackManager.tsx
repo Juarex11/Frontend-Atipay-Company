@@ -1,124 +1,373 @@
-import React, { useState, useEffect } from 'react';
-import { X, Trash2, Package, AlertTriangle } from 'lucide-react';
-import { getPacks, deletePack, type Pack } from '../../../services/adminPurchaseService';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Search, CheckSquare, ArrowRight, Save, Package, Plus, Calculator, Image as ImageIcon, Camera, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Product, ConversionRule } from '../../../services/adminPurchaseService';
+import { createPack, getProductsForSelector, getConversionRules } from '../../../services/adminPurchaseService';
 
-interface PackManagerProps {
+interface CreatePackModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onPackChanged: () => void; // Para avisar que recargue productos
+    onSuccess: () => void;
 }
 
-export const PackManager: React.FC<PackManagerProps> = ({ isOpen, onClose, onPackChanged }) => {
-    const [packs, setPacks] = useState<Pack[]>([]);
+interface CustomItem {
+    tempId: number;
+    name: string;
+    price: number;
+    points: number;
+    image: File | null;
+    imagePreview: string | null;
+}
+
+const ITEMS_PER_PAGE = 9; 
+
+export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClose, onSuccess }) => {
+    const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [packToDelete, setPackToDelete] = useState<number | null>(null);
+    
+    // Datos
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+    const [savedRules, setSavedRules] = useState<ConversionRule[]>([]);
+    
+    // Paso 1
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [customItems, setCustomItems] = useState<CustomItem[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1); 
+    
+    // Quick Create
+    const [showQuickCreate, setShowQuickCreate] = useState(false);
+    const [newItemName, setNewItemName] = useState('');
+    const [newItemPrice, setNewItemPrice] = useState('');
+    const [newItemPoints, setNewItemPoints] = useState('');
+    const [newItemImage, setNewItemImage] = useState<File | null>(null);
+    const itemFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Paso 2
+    const [packName, setPackName] = useState('');
+    const [packDescription, setPackDescription] = useState('');
+    const [packImage, setPackImage] = useState<File | null>(null);
+    const packFileInputRef = useRef<HTMLInputElement>(null);
+
+    const [selectedRuleId, setSelectedRuleId] = useState<string>(''); 
+    const [ruleMoney, setRuleMoney] = useState<number>(3.00);
+    const [rulePoints, setRulePoints] = useState<number>(1.00);
+    const [manualPoints, setManualPoints] = useState<Record<number, number>>({});
+    const [customManualPoints, setCustomManualPoints] = useState<Record<number, number>>({});
 
     useEffect(() => {
-        if (isOpen) loadPacks();
+        if (isOpen) {
+            initData();
+            setStep(1);
+            setSelectedIds([]);
+            setCustomItems([]);
+            setPackName('');
+            setPackDescription('');
+            setPackImage(null);
+            setManualPoints({});
+            setCustomManualPoints({});
+            setShowQuickCreate(false);
+            setSearchTerm('');
+            setCurrentPage(1);
+        }
     }, [isOpen]);
 
-    const loadPacks = async () => {
-        setLoading(true);
-        const data = await getPacks();
-        setPacks(data);
-        setLoading(false);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    const initData = async () => {
+        try {
+            const [prods, rules] = await Promise.all([getProductsForSelector(), getConversionRules(true)]);
+            setAllProducts(prods);
+            setSavedRules(rules);
+        } catch (e) { console.error(e); }
     };
 
-    const confirmDelete = async () => {
-        if (!packToDelete) return;
+    const filteredProducts = allProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+    const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+    const handleAddCustomItem = () => {
+        if (!newItemName || !newItemPrice || !newItemPoints) return alert("Llena nombre, precio y puntos");
+        if (parseFloat(newItemPrice) < 0 || parseFloat(newItemPoints) < 0) return alert("❌ No negativos.");
+
+        const newItem: CustomItem = {
+            tempId: Date.now(),
+            name: newItemName,
+            price: parseFloat(newItemPrice),
+            points: parseFloat(newItemPoints),
+            image: newItemImage,
+            imagePreview: newItemImage ? URL.createObjectURL(newItemImage) : null
+        };
+
+        setCustomItems(prev => [...prev, newItem]);
+        setNewItemName(''); setNewItemPrice(''); setNewItemPoints(''); setNewItemImage(null);
+        if (itemFileInputRef.current) itemFileInputRef.current.value = '';
+        setShowQuickCreate(false);
+    };
+
+    const handleRemoveCustomItem = (tempId: number) => {
+        setCustomItems(prev => prev.filter(item => item.tempId !== tempId));
+        const newPoints = { ...customManualPoints };
+        delete newPoints[tempId];
+        setCustomManualPoints(newPoints);
+    };
+
+    const handleRuleSelect = (ruleId: string) => {
+        setSelectedRuleId(ruleId);
+        const rule = savedRules.find(r => r.id.toString() === ruleId);
+        if (rule) {
+            setRuleMoney(rule.amount_required);
+            setRulePoints(rule.points_awarded);
+        }
+    };
+
+    const selectedExistingProducts = useMemo(() => allProducts.filter(p => selectedIds.includes(p.id)), [allProducts, selectedIds]);
+    const totalExistingPrice = selectedExistingProducts.reduce((sum, p) => sum + parseFloat(p.price.toString()), 0);
+    const totalCustomPrice = customItems.reduce((sum, p) => sum + p.price, 0);
+    const totalPrice = totalExistingPrice + totalCustomPrice;
+    const targetTotalPoints = ruleMoney > 0 ? (totalPrice / ruleMoney) * rulePoints : 0;
+    const getAutoPoints = (price: number) => (totalPrice === 0 ? 0 : (price / totalPrice) * targetTotalPoints);
+
+    const totalAssignedPoints = 
+        selectedExistingProducts.reduce((sum, p) => sum + (manualPoints[p.id] !== undefined ? manualPoints[p.id] : getAutoPoints(parseFloat(p.price.toString()))), 0) +
+        customItems.reduce((sum, p) => sum + (customManualPoints[p.tempId] !== undefined ? customManualPoints[p.tempId] : p.points), 0);
+
+    const isBalanced = Math.abs(totalAssignedPoints - targetTotalPoints) < 0.05;
+
+    const handleSavePack = async () => {
+        if (!packName.trim()) return alert("Falta el nombre del Pack");
+        if ((selectedIds.length === 0 && customItems.length === 0)) return alert("El pack está vacío");
+        if (!isBalanced && !confirm(`⚠️ Puntos no coinciden (${totalAssignedPoints.toFixed(2)} vs ${targetTotalPoints.toFixed(2)}). ¿Guardar igual?`)) return;
+        if (selectedIds.length > 0 && !confirm("⚠️ Se actualizarán los puntos de los productos existentes. ¿Continuar?")) return;
+
+        setLoading(true);
         try {
-            await deletePack(packToDelete);
-            setPackToDelete(null);
-            await loadPacks();
-            onPackChanged(); // Avisamos para recargar la vista principal
-        } catch (error) {
-            console.error(error); // <--- CORRECCIÓN: Usamos la variable error para que no se queje
-            alert("Error al eliminar pack");
+            const formData = new FormData();
+            formData.append('name', packName);
+            formData.append('description', packDescription);
+            formData.append('conversion_money', ruleMoney.toString());
+            formData.append('conversion_points', rulePoints.toString());
+            formData.append('total_pack_price', totalPrice.toString());
+            formData.append('total_pack_points', totalAssignedPoints.toString());
+            if (packImage) formData.append('image', packImage);
+
+            selectedIds.forEach((id, index) => {
+                formData.append(`products[${index}]`, id.toString());
+                const p = selectedExistingProducts.find(p => p.id === id);
+                if (p) {
+                    const finalPts = manualPoints[id] !== undefined ? manualPoints[id] : getAutoPoints(parseFloat(p.price.toString()));
+                    formData.append(`manual_distributions[${id}]`, finalPts.toString());
+                }
+            });
+
+            customItems.forEach((item, index) => {
+                formData.append(`items[${index}][name]`, item.name);
+                formData.append(`items[${index}][price]`, item.price.toString());
+                const finalPts = customManualPoints[item.tempId] !== undefined ? customManualPoints[item.tempId] : item.points;
+                formData.append(`items[${index}][points]`, finalPts.toString());
+                if (item.image) formData.append(`items[${index}][image]`, item.image);
+            });
+
+            await createPack(formData as any);
+            onSuccess();
+            onClose();
+        } catch (error) { 
+            console.error(error);
+            const err = error as any;
+            alert("Error: " + (err.message || "Error desconocido")); 
+        } finally { 
+            setLoading(false); 
         }
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            {/* ✅ SOLUCIÓN: Usamos 'max-h-[85vh]' para limitar la altura a la pantalla y 'flex flex-col' */}
+            <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 transform transition-all animate-in zoom-in-95">
                 
-                {/* Header */}
-                <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <Package className="w-5 h-5 text-purple-600"/> Mis Packs Creados
-                    </h2>
-                    <button onClick={onClose}><X className="text-gray-400 hover:text-gray-600"/></button>
+                {/* HEADER - Altura fija */}
+                <div className="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                            <div className="p-2 bg-purple-100 rounded-lg text-purple-600"><Package className="w-5 h-5"/></div>
+                            {step === 1 ? 'Paso 1: Configurar Contenido' : 'Paso 2: Detalles y Reglas'}
+                        </h2>
+                    </div>
+                    <button onClick={onClose} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><X className="w-5 h-5"/></button>
                 </div>
 
-                {/* Lista */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {loading ? <p className="text-center text-gray-400">Cargando...</p> : 
-                     packs.length === 0 ? (
-                        <div className="text-center py-10">
-                            <Package className="w-12 h-12 text-gray-200 mx-auto mb-2"/>
-                            <p className="text-gray-400">No hay packs creados aún.</p>
-                        </div>
-                     ) : (
-                        packs.map(pack => (
-                            <div key={pack.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all bg-white group">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-bold text-gray-900 text-lg">{pack.name}</h3>
-                                        <div className="flex gap-2 mt-1 text-xs text-gray-500">
-                                            <span className="bg-purple-50 text-purple-700 px-2 py-1 rounded-md font-bold">
-                                                Regla: S/ {Number(pack.conversion_factor_money).toFixed(2)} = {Number(pack.conversion_factor_points).toFixed(2)} pts
-                                            </span>
-                                            <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
-                                                Total Pack: {Number(pack.total_pack_points).toFixed(2)} pts
-                                            </span>
+                {/* BODY SCROLLABLE - 'flex-1' llena el espacio disponible, 'overflow-y-auto' permite scroll */}
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 custom-scrollbar relative">
+                    
+                    {step === 1 && (
+                        <div className="space-y-6">
+                            {/* BARRA DE ACCIÓN */}
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+                                    <input type="text" placeholder="Buscar producto..." className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                </div>
+                                <button onClick={() => setShowQuickCreate(!showQuickCreate)} className={`px-5 py-3 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 shadow-sm ${showQuickCreate ? 'bg-purple-900 text-white border-purple-900' : 'bg-white text-purple-700 border-purple-200 hover:bg-purple-50'}`}>
+                                    <Plus className="w-4 h-4"/> {showQuickCreate ? 'Cerrar' : 'Crear Custom'}
+                                </button>
+                            </div>
+
+                            {/* PANEL CREACIÓN RÁPIDA */}
+                            {showQuickCreate && (
+                                <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-xl animate-in slide-in-from-top-2 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500"/>
+                                    <h4 className="text-xs font-bold text-purple-800 uppercase mb-4 flex items-center gap-2"><Package className="w-3 h-3"/> Nuevo Item Personalizado</h4>
+                                    
+                                    <div className="flex flex-col sm:flex-row gap-4 items-start">
+                                        <div onClick={() => itemFileInputRef.current?.click()} className={`w-full sm:w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0 ${newItemImage ? 'border-purple-500 bg-purple-50' : 'border-gray-300 hover:border-purple-400'}`}>
+                                            <input ref={itemFileInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setNewItemImage(e.target.files[0])} />
+                                            {newItemImage ? <img src={URL.createObjectURL(newItemImage)} className="w-full h-full object-cover rounded-lg" /> : <Camera className="w-6 h-6 text-gray-400"/>}
+                                        </div>
+
+                                        <div className="flex-1 w-full space-y-3">
+                                            <input value={newItemName} onChange={e=>setNewItemName(e.target.value)} className="w-full px-4 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Nombre (Ej: Botella)" />
+                                            <div className="flex gap-3">
+                                                <div className="relative flex-1"><span className="absolute left-3 top-2 text-xs font-bold text-gray-400">S/</span><input type="number" min="0" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} className="w-full pl-8 pr-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Precio" /></div>
+                                                <div className="relative flex-1"><span className="absolute left-3 top-2 text-xs font-bold text-amber-500">Pts</span><input type="number" min="0" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} className="w-full pl-8 pr-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Puntos" /></div>
+                                            </div>
+                                            <button onClick={handleAddCustomItem} className="w-full bg-purple-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-purple-700 shadow-md transition-colors">Agregar al Pack</button>
                                         </div>
                                     </div>
-                                    <button 
-                                        onClick={() => setPackToDelete(pack.id)}
-                                        className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
-                                        title="Disolver Pack"
-                                    >
-                                        <Trash2 className="w-5 h-5"/>
-                                    </button>
                                 </div>
+                            )}
 
-                                {/* Productos dentro */}
-                                <div className="mt-4 pt-3 border-t border-gray-100">
-                                    <p className="text-xs font-bold text-gray-400 mb-2">PRODUCTOS INCLUIDOS:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {pack.products?.map(prod => (
-                                            <span key={prod.id} className="text-xs bg-gray-50 border border-gray-200 px-2 py-1 rounded text-gray-600 flex items-center gap-1">
-                                                {prod.name}
-                                                <span className="font-bold text-green-600 ml-1">({Number(prod.points_earned).toFixed(2)} pts)</span>
-                                            </span>
-                                        ))}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* ITEMS PERSONALIZADOS */}
+                                {customItems.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase">Items Personalizados ({customItems.length})</h3>
+                                        <div className="space-y-2">
+                                            {customItems.map(item => (
+                                                <div key={item.tempId} className="flex items-center gap-3 bg-purple-50 p-3 rounded-xl border border-purple-100">
+                                                    <div className="w-10 h-10 bg-white rounded-lg border border-purple-100 overflow-hidden flex-shrink-0">
+                                                        {item.imagePreview ? <img src={item.imagePreview} className="w-full h-full object-cover"/> : <Package className="w-full h-full p-2 text-purple-200"/>}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-purple-900 text-sm truncate">{item.name}</p>
+                                                        <p className="text-xs text-purple-600">S/ {item.price.toFixed(2)} • <span className="font-bold">{item.points} pts</span></p>
+                                                    </div>
+                                                    <button onClick={() => handleRemoveCustomItem(item.tempId)} className="p-2 text-purple-400 hover:text-red-500 hover:bg-white rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
+                                )}
+
+                                {/* CATÁLOGO GENERAL (Grid & Paginación) */}
+                                <div className="space-y-2 col-span-1 lg:col-span-2">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase">Catálogo General</h3>
+                                        <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">{filteredProducts.length} items</span>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {paginatedProducts.map(product => {
+                                            const isSelected = selectedIds.includes(product.id);
+                                            return (
+                                                <div key={product.id} onClick={() => setSelectedIds(prev => prev.includes(product.id) ? prev.filter(i=>i!==product.id) : [...prev, product.id])} className={`cursor-pointer p-2 rounded-xl border flex items-center gap-3 transition-all ${isSelected ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500' : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'}`}>
+                                                    <div className="w-10 h-10 rounded-lg bg-gray-50 overflow-hidden shrink-0 border border-gray-100">
+                                                        {product.image_url ? <img src={product.image_url} className="w-full h-full object-cover"/> : <Package className="w-full h-full p-2.5 text-gray-300"/>}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`font-bold text-sm truncate ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{product.name}</p>
+                                                        <p className="text-xs text-gray-500 font-medium">S/ {Number(product.price).toFixed(2)}</p>
+                                                    </div>
+                                                    {isSelected && <div className="bg-blue-600 text-white rounded-full p-0.5"><CheckSquare className="w-3.5 h-3.5"/></div>}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* PAGINACIÓN */}
+                                    {totalPages > 1 && (
+                                        <div className="flex justify-center items-center gap-4 mt-4 pt-3 border-t border-dashed border-gray-200">
+                                            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronLeft className="w-4 h-4 text-gray-600"/></button>
+                                            <span className="text-xs text-gray-500 font-bold">Página {currentPage} de {totalPages}</span>
+                                            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg bg-white border hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronRight className="w-4 h-4 text-gray-600"/></button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                        ))
-                     )}
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <div className="space-y-6">
+                            <div className="flex flex-col md:flex-row gap-6">
+                                <div onClick={() => packFileInputRef.current?.click()} className={`w-full md:w-40 h-40 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden shrink-0 ${packImage ? 'border-purple-500' : 'border-gray-300 hover:bg-gray-50'}`}>
+                                    <input ref={packFileInputRef} type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files && setPackImage(e.target.files[0])} />
+                                    {packImage ? <img src={URL.createObjectURL(packImage)} className="w-full h-full object-cover" /> : <div className="text-center"><ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2"/><span className="text-xs text-gray-500 font-bold">SUBIR FOTO</span></div>}
+                                </div>
+                                <div className="flex-1 space-y-4">
+                                    <div><label className="text-xs font-bold text-gray-500 uppercase ml-1">Nombre del Pack</label><input value={packName} onChange={e => setPackName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500 outline-none font-bold" placeholder="Ej: Pack Verano 2025" /></div>
+                                    <div><label className="text-xs font-bold text-gray-500 uppercase ml-1">Descripción</label><textarea value={packDescription} onChange={e => setPackDescription(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-purple-500 outline-none h-20 resize-none" placeholder="Describe el contenido..." /></div>
+                                </div>
+                            </div>
+
+                            {/* REGLAS */}
+                            <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2"><Calculator className="w-4 h-4"/> Regla de Conversión</h3>
+                                    <select className="bg-white border border-blue-200 text-xs font-bold text-blue-700 rounded-lg px-2 py-1.5 outline-none cursor-pointer hover:border-blue-400 transition-colors" value={selectedRuleId} onChange={(e) => handleRuleSelect(e.target.value)}>
+                                        <option value="">-- Personalizada --</option>
+                                        {savedRules.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                    <div className="flex-1 w-full bg-white p-3 rounded-xl border border-blue-100 flex items-center justify-between px-4 shadow-sm"><span className="text-xs font-bold text-gray-500">POR CADA</span><div className="flex items-center gap-1"><span className="text-gray-400 font-bold text-sm">S/</span><input type="number" min="0" value={ruleMoney} onChange={e => setRuleMoney(parseFloat(e.target.value))} className="w-20 text-right font-bold text-gray-800 outline-none bg-transparent"/></div></div>
+                                    <ArrowRight className="w-5 h-5 text-blue-300 hidden sm:block"/>
+                                    <div className="flex-1 w-full bg-white p-3 rounded-xl border border-green-100 flex items-center justify-between px-4 shadow-sm"><span className="text-xs font-bold text-gray-500">GANA</span><div className="flex items-center gap-1"><input type="number" min="0" value={rulePoints} onChange={e => setRulePoints(parseFloat(e.target.value))} className="w-20 text-right font-bold text-green-600 outline-none bg-transparent"/><span className="text-green-500 font-bold text-sm">Pts</span></div></div>
+                                </div>
+                            </div>
+
+                            {/* TABLA */}
+                            <div className="border rounded-2xl overflow-hidden shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-gray-50 text-xs font-bold text-gray-400 uppercase border-b">
+                                            <tr><th className="px-4 py-3">Producto</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right">Pts. Calc</th><th className="px-4 py-3 text-right w-32">Final</th></tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {selectedExistingProducts.map(p => {
+                                                const price = parseFloat(p.price.toString());
+                                                const autoVal = getAutoPoints(price);
+                                                const manualVal = manualPoints[p.id];
+                                                return (<tr key={`exist-${p.id}`} className="hover:bg-gray-50"><td className="px-4 py-2.5 font-medium text-gray-700">{p.name}</td><td className="px-4 py-2.5 text-right text-gray-500 text-xs">S/ {price.toFixed(2)}</td><td className="px-4 py-2.5 text-right text-gray-400 text-xs">{autoVal.toFixed(2)}</td><td className="px-4 py-2.5 text-right"><input type="number" min="0" className="w-20 text-right border rounded px-1 py-1 text-xs font-bold focus:border-blue-500 outline-none" value={(manualVal !== undefined ? manualVal : autoVal).toFixed(2)} onChange={e => setManualPoints({...manualPoints, [p.id]: parseFloat(e.target.value)})}/></td></tr>);
+                                            })}
+                                            {customItems.map(p => {
+                                                const manualVal = customManualPoints[p.tempId];
+                                                return (<tr key={`custom-${p.tempId}`} className="hover:bg-purple-50 bg-purple-50/30"><td className="px-4 py-2.5 font-medium text-purple-900 flex items-center gap-2"><Package className="w-3 h-3 text-purple-400"/> {p.name}</td><td className="px-4 py-2.5 text-right text-gray-500 text-xs">S/ {p.price.toFixed(2)}</td><td className="px-4 py-2.5 text-right text-gray-400 text-xs">{p.points.toFixed(2)}</td><td className="px-4 py-2.5 text-right"><input type="number" min="0" className="w-20 text-right border rounded px-1 py-1 text-xs font-bold text-purple-700 border-purple-200 focus:border-purple-500 outline-none" value={(manualVal !== undefined ? manualVal : p.points).toFixed(2)} onChange={e => setCustomManualPoints({...customManualPoints, [p.tempId]: parseFloat(e.target.value)})}/></td></tr>);
+                                            })}
+                                        </tbody>
+                                        <tfoot className="bg-gray-50 border-t">
+                                            <tr><td className="px-4 py-3 font-bold text-gray-600 text-xs uppercase">Totales</td><td className="px-4 py-3 text-right font-bold text-gray-900">S/ {totalPrice.toFixed(2)}</td><td className="px-4 py-3 text-right font-bold text-blue-600">Meta: {targetTotalPoints.toFixed(2)}</td><td className="px-4 py-3 text-right"><span className={`font-bold px-2 py-1 rounded text-xs ${isBalanced ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'}`}>{totalAssignedPoints.toFixed(2)}</span></td></tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* FOOTER - Altura fija */}
+                <div className="px-6 py-4 border-t border-gray-100 bg-white flex justify-between items-center shrink-0">
+                    {step === 2 && <button onClick={() => setStep(1)} className="px-6 py-2.5 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm hover:bg-gray-50 transition-colors">Atrás</button>}
+                    {step === 1 ? (
+                        <div className="flex justify-end w-full"><button onClick={() => (selectedIds.length > 0 || customItems.length > 0) ? setStep(2) : alert("Selecciona al menos 1 producto")} className="bg-gray-900 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-black shadow-lg transition-transform active:scale-95 flex items-center gap-2">Siguiente <ArrowRight className="w-4 h-4"/></button></div>
+                    ) : (
+                        <button onClick={handleSavePack} disabled={loading} className={`px-8 py-2.5 rounded-xl font-bold text-white text-sm flex items-center gap-2 shadow-lg ml-auto transition-transform active:scale-95 ${isBalanced ? 'bg-green-600 hover:bg-green-700' : 'bg-red-500 hover:bg-red-600'}`}>{loading ? 'Guardando...' : <><Save className="w-4 h-4"/> Guardar Pack</>}</button>
+                    )}
                 </div>
             </div>
-
-            {/* Modal Confirmación Borrado */}
-            {packToDelete && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95 border-4 border-red-50">
-                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-red-50">
-                            <AlertTriangle className="w-6 h-6 text-red-600"/>
-                        </div>
-                        <h3 className="font-bold text-lg text-gray-900 mb-2">¿Disolver este Pack?</h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            Los productos volverán a ser individuales. Sus puntos se mantendrán hasta que los edites.
-                        </p>
-                        <div className="flex gap-3">
-                            <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-2.5 rounded-xl font-bold hover:bg-red-700 shadow-lg">Sí, Disolver</button>
-                            <button onClick={() => setPackToDelete(null)} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-bold hover:bg-gray-200 border">Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

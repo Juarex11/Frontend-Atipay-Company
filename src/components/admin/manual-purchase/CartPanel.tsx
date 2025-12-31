@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, ShoppingBag, X, Award, Info, Banknote, Wallet, ArrowRight, Send } from 'lucide-react';
+import { Users, ChevronDown, ShoppingBag, X, Award, Info, Banknote, Wallet, ArrowRight, Send, ExternalLink } from 'lucide-react';
 import type { User, CartItem } from './types';
 
 interface CartPanelProps {
@@ -13,7 +13,7 @@ interface CartPanelProps {
     paymentMethod: 'cash' | 'wallet';
     setPaymentMethod: (method: 'cash' | 'wallet') => void;
     onSubmit: () => void;
-    onSendToStore: () => void; // <--- Nueva función recibida
+    onSendToStore: () => void;
     loading: boolean;
     errorMsg: string | null;
     successMsg: string | null;
@@ -42,6 +42,14 @@ export const CartPanel: React.FC<CartPanelProps> = ({
     const userBalance = selectedUserData?.atipay_money || 0;
     const hasEnoughBalance = !selectedUserData || paymentMethod === 'cash' || userBalance >= totalMoney;
 
+    // Lógica nueva para ir a la tienda
+    const handleOpenStore = () => {
+        if (selectedUser) {
+            // Abre la tienda en una pestaña nueva filtrando por el cliente
+            window.open(`/tienda?client_id=${selectedUser}`, '_blank');
+        }
+    };
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -57,6 +65,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({
             {/* CLIENTE DROPDOWN */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 relative z-30">
                 <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><Users className="w-4 h-4"/> Cliente</h3>
+                
                 <div className="relative" ref={dropdownRef}>
                     <div onClick={() => setIsOpen(!isOpen)} className={`w-full border rounded-xl px-4 py-3 flex items-center justify-between cursor-pointer hover:border-green-400 transition-colors ${!selectedUser ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
                         <span className={`text-sm ${selectedUser ? 'font-bold text-gray-800' : 'text-red-400'}`}>
@@ -87,6 +96,16 @@ export const CartPanel: React.FC<CartPanelProps> = ({
                         </div>
                     )}
                 </div>
+
+                {/* 🔥 BOTÓN NUEVO: VER TIENDA DEL USUARIO */}
+                {selectedUser && (
+                    <button 
+                        onClick={handleOpenStore}
+                        className="mt-3 w-full py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5"/> Ver Tienda del Usuario
+                    </button>
+                )}
             </div>
 
             {/* CARRITO Y PAGO */}

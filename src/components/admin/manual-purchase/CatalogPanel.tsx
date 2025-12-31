@@ -1,427 +1,440 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
-    Search, Plus, Package, Zap, Layers, Save, Loader2, Pencil, Ban, 
-    Eye, EyeOff, Info, X, Tag, Box, CheckCircle, ShoppingCart, Camera, Image as ImageIcon 
+    Search, Package, Plus, Filter, X, Edit, Layers, 
+    Save, Calculator, ArrowRight, AlertTriangle, CheckCircle, Camera, Upload,
+    Eye, EyeOff, Trash2, ChevronLeft, ChevronRight 
 } from 'lucide-react';
+import type { Product, Pack, ConversionRule } from '../../../services/adminPurchaseService';
+import { createProduct, updateProduct, createConversionRule, deleteProduct, deletePack } from '../../../services/adminPurchaseService';
 
-import { 
-    type Product, type Pack, 
-    createProduct, updateProduct, deletePack, togglePackStatus 
-} from '../../../services/adminPurchaseService';
+// --- COMPONENTES DE ALERTAS Y MODALES ---
+
+const CustomAlert = ({ 
+    type, title, message, onClose 
+}: { 
+    type: 'success' | 'error' | 'warning', 
+    title: string, 
+    message: string, 
+    onClose: () => void 
+}) => (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 transform transition-all animate-in zoom-in-95 relative overflow-hidden">
+            <div className={`absolute top-0 left-0 w-full h-1.5 ${type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-amber-500'}`} />
+            <div className="flex flex-col items-center text-center space-y-4 pt-2">
+                <div className={`p-4 rounded-full ${type === 'error' ? 'bg-red-50 text-red-500' : type === 'success' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-500'}`}>
+                    {type === 'error' && <X className="w-8 h-8" />}
+                    {type === 'success' && <CheckCircle className="w-8 h-8" />}
+                    {type === 'warning' && <AlertTriangle className="w-8 h-8" />}
+                </div>
+                <div>
+                    <h3 className="text-xl font-extrabold text-gray-900">{title}</h3>
+                    <p className="text-sm text-gray-500 mt-2 leading-relaxed font-medium">{message}</p>
+                </div>
+                <button onClick={onClose} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-transform active:scale-95 ${type === 'error' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' : type === 'success' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/30' : 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30'}`}>
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+const ConfirmModal = ({ 
+    title, message, onConfirm, onCancel 
+}: { 
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    onCancel: () => void 
+}) => (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 transform transition-all animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center space-y-4">
+                <div className="p-4 rounded-full bg-red-50 text-red-500 border border-red-100">
+                    <Trash2 className="w-8 h-8" />
+                </div>
+                <div>
+                    <h3 className="text-lg font-extrabold text-gray-900">{title}</h3>
+                    <p className="text-sm text-gray-500 mt-2 leading-relaxed">{message}</p>
+                </div>
+                <div className="flex gap-3 w-full mt-2">
+                    <button onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">Cancelar</button>
+                    <button onClick={onConfirm} className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 transition-transform active:scale-95">Sí, Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+);
 
 interface CatalogPanelProps {
     products: Product[];
     packs: Pack[];
+    rules: ConversionRule[];
     loading: boolean;
     onAddProduct: (product: Product) => void;
     onAddPack: (pack: Pack) => void;
+    onAddLooseItem: (amount: number, desc: string, ruleId: string | null, manualPoints?: number) => void;
     onSaveCartAsPack: () => void;
     onRulesChange: () => void;
     onEditPack: (pack: Pack) => void;
 }
 
+const ITEMS_PER_PAGE = 8; 
+
 export const CatalogPanel = ({ 
-    products, 
-    packs, 
-    loading, 
-    onAddProduct, 
-    onAddPack, 
-    onSaveCartAsPack,
-    onRulesChange,
-    onEditPack
+    products, packs, rules, loading, 
+    onAddProduct, onAddPack, onAddLooseItem, onSaveCartAsPack, onRulesChange, onEditPack 
 }: CatalogPanelProps) => {
     
-    // --- ESTADOS GLOBALES ---
-    const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'catalog' | 'packs'>('catalog');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showQuickCreate, setShowQuickCreate] = useState(false);
     
-    // --- ESTADOS DE GESTIÓN DE PRODUCTO ---
-    const [idToEdit, setIdToEdit] = useState<number | null>(null);
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // Estados para Alertas y Confirmaciones
+    const [alertState, setAlertState] = useState<{show: boolean, type: 'success'|'error'|'warning', title: string, msg: string} | null>(null);
+    const [confirmState, setConfirmState] = useState<{show: boolean, id: number, type: 'product' | 'pack'} | null>(null);
+
+    const showAlert = (type: 'success'|'error'|'warning', title: string, msg: string) => {
+        setAlertState({ show: true, type, title, msg });
+    };
+
+    // Estados Formularios
+    const [showRuleModal, setShowRuleModal] = useState(false);
+    const [newRuleName, setNewRuleName] = useState('');
+    const [newRuleMoney, setNewRuleMoney] = useState('');
+    const [newRulePoints, setNewRulePoints] = useState('');
+
     const [prodName, setProdName] = useState('');
     const [prodPrice, setProdPrice] = useState('');
     const [prodPoints, setProdPoints] = useState('');
-    
-    // NUEVOS ESTADOS PARA IMAGEN Y DESCRIPCIÓN
-    const [prodDescription, setProdDescription] = useState('');
+    const [prodVisible, setProdVisible] = useState(true);
     const [prodImage, setProdImage] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isCreating, setIsCreating] = useState(false);
+    const prodFileInputRef = useRef<HTMLInputElement>(null);
 
-    const [isVisible, setIsVisible] = useState(true); 
-    const [isProcessing, setIsProcessing] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editPrice, setEditPrice] = useState('');
+    const [editPoints, setEditPoints] = useState('');
+    const [editVisible, setEditVisible] = useState(true);
+    const [editImage, setEditImage] = useState<File | null>(null);
+    const editFileInputRef = useRef<HTMLInputElement>(null);
 
-    // --- ESTADO PARA EL MODAL DE DETALLE ---
-    const [viewProduct, setViewProduct] = useState<Product | null>(null);
+    const [looseAmount, setLooseAmount] = useState('');
+    const [looseDesc, setLooseDesc] = useState('Abarrotes');
+    const [selectedRule, setSelectedRule] = useState<string>('manual');
+    const [manualPoints, setManualPoints] = useState('');
 
-    // --- TOAST ---
-    const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
-    const showToast = (message: string, type: 'success' | 'error') => {
-        setToast({ show: true, message, type });
-        setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const getPoints = (p: any) => {
-        const val = p.points ?? p.points_earned ?? 0;
-        return Number(val) || 0;
-    };
-
-    // =========================================================================
-    // HANDLERS
-    // =========================================================================
-
-    const handleEditProductClick = (e: React.MouseEvent, p: Product) => {
-        e.stopPropagation();
-        setIdToEdit(p.id);
-        setProdName(p.name);
-        setProdPrice(p.price.toString());
-        setProdPoints(getPoints(p).toFixed(2));
-        setProdDescription(p.description || ''); // Cargar descripción existente
-        setIsVisible(p.is_visible !== false && p.is_visible !== 0); 
-        setProdImage(null); // Resetear imagen nueva al editar
-        document.querySelector('.catalog-header')?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    const handleCancelEdit = () => {
-        setIdToEdit(null);
-        setProdName('');
-        setProdPrice('');
-        setProdPoints('');
-        setProdDescription('');
-        setProdImage(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setIsVisible(true);
-    };
-
-    const handlePriceChange = (val: string) => {
-        setProdPrice(val);
-        if (!idToEdit && (!prodPoints || prodPoints === '0.00')) {
-            const num = parseFloat(val);
-            if (!isNaN(num)) {
-                setProdPoints((num / 3).toFixed(2));
-            } else {
-                setProdPoints('');
-            }
+    useEffect(() => {
+        if (rules.length > 0 && selectedRule === 'manual' && !manualPoints) {
+            setSelectedRule(rules[0].id.toString());
         }
-    };
+    }, [rules]);
 
-    const handleSaveProduct = async () => {
-        if (!prodName.trim() || !prodPrice || !prodPoints) return alert("Faltan datos");
-        setIsProcessing(true);
-        try {
-            const formData = new FormData();
-            formData.append('name', prodName);
-            formData.append('price', prodPrice);
-            formData.append('points', prodPoints);
-            formData.append('points_earned', prodPoints);
-            formData.append('description', prodDescription || (idToEdit ? '' : 'Producto Rápido'));
-            formData.append('is_visible', isVisible ? '1' : '0');
-            
-            if (prodImage) {
-                formData.append('image', prodImage);
-            }
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, activeTab]);
 
-            if (idToEdit) {
-                formData.append('_method', 'PUT');
-                // ¡BORRAMOS EL @ts-ignore AQUÍ!
-                await updateProduct(idToEdit, formData);
-                showToast(`Producto actualizado`, 'success');
-            } else {
-                // ¡BORRAMOS EL @ts-ignore AQUÍ TAMBIÉN!
-                await createProduct(formData);
-                showToast(`Producto creado`, 'success');
-            }
-
-            handleCancelEdit();
-            onRulesChange(); 
-        } catch (error) { 
-            console.error(error);
-            showToast("Error al guardar", 'error'); 
-        } finally { 
-            setIsProcessing(false); 
-        }
-    };
-    
-    const handleDeletePack = async (e: React.MouseEvent, id: number) => {
-        e.stopPropagation(); 
-        if (!window.confirm("¿Eliminar este Pack?")) return;
-        try {
-            await deletePack(id);
-            showToast("Pack eliminado", 'success');
-            onRulesChange();
-        } catch (error) { 
-            console.error(error); // <--- AGREGA ESTO
-            showToast("Error al eliminar", 'error'); 
-        }
-    };
-
-    const handleEditClick = (e: React.MouseEvent, pack: Pack) => {
-        e.stopPropagation();
-        onEditPack(pack); 
-    };
-
-    const handleTogglePack = async (e: React.MouseEvent, id: number) => {
-        e.stopPropagation();
-        try {
-            await togglePackStatus(id);
-            showToast("Estado actualizado", 'success');
-            onRulesChange(); 
-        } catch (error) { 
-            console.error(error); // <--- AGREGA ESTO
-            showToast("Error al cambiar estado", 'error'); 
-        }
-    };
-
-    // =========================================================================
-    // RENDER
-    // =========================================================================
-    
     const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     const filteredPacks = packs.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    const currentItems = activeTab === 'catalog' ? filteredProducts : filteredPacks;
+    const totalPages = Math.ceil(currentItems.length / ITEMS_PER_PAGE);
+    const paginatedItems = currentItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+    // --- HANDLERS ---
+
+    const handleCreateRule = async () => {
+        if (!newRuleName || !newRuleMoney || !newRulePoints) return showAlert('warning', 'Campos Vacíos', 'Por favor completa todos los datos.');
+        if (parseFloat(newRuleMoney) < 0 || parseFloat(newRulePoints) < 0) return showAlert('error', 'Valor Inválido', 'No negativos.');
+        try {
+            await createConversionRule({ name: newRuleName, amount_required: parseFloat(newRuleMoney), points_awarded: parseFloat(newRulePoints), is_active: true });
+            onRulesChange(); setShowRuleModal(false); setNewRuleName(''); setNewRuleMoney(''); setNewRulePoints(''); 
+            showAlert('success', 'Regla Creada', 'Regla guardada correctamente.');
+        } catch (error) { console.error(error); showAlert('error', 'Error', 'No se pudo guardar la regla.'); }
+    };
+
+    const handleSaveProduct = async () => {
+        if (!prodName.trim() || !prodPrice || !prodPoints) return showAlert('warning', 'Faltan Datos', 'Nombre, Precio y Puntos son obligatorios.');
+        if (Number(prodPrice) < 0 || Number(prodPoints) < 0) return showAlert('error', 'Error', 'No negativos.');
+        setIsCreating(true);
+        try {
+            await createProduct({ name: prodName, price: parseFloat(prodPrice), points: parseFloat(prodPoints), stock: 100, type: 'product', description: 'Producto Rápido', image: prodImage, is_visible: prodVisible });
+            setProdName(''); setProdPrice(''); setProdPoints(''); setProdImage(null); setProdVisible(true);
+            if (prodFileInputRef.current) prodFileInputRef.current.value = '';
+            setShowQuickCreate(false); onRulesChange(); 
+            showAlert('success', 'Creado', 'Producto agregado con éxito.');
+        } catch (error) { console.error(error); const err = error as any; showAlert('error', 'Error', err.message || 'Error inesperado.'); } finally { setIsCreating(false); }
+    };
+
+    const requestDelete = (id: number, type: 'product' | 'pack') => { setConfirmState({ show: true, id, type }); };
+
+    const confirmDelete = async () => {
+        if (!confirmState) return;
+        try {
+            if (confirmState.type === 'pack') {
+                await deletePack(confirmState.id);
+            } else {
+                await deleteProduct(confirmState.id);
+            }
+            onRulesChange(); 
+            showAlert('success', 'Eliminado', 'Ítem eliminado correctamente.');
+        } catch (error: any) {
+            console.error("Error al eliminar:", error);
+            const errorMsg = error.message || '';
+            if (errorMsg.includes('404') || errorMsg.includes('found') || errorMsg.includes('encontrado')) {
+                onRulesChange(); 
+                showAlert('warning', 'Aviso', 'El ítem ya no existía, lista actualizada.');
+            } else {
+                showAlert('error', 'Error', errorMsg || 'No se pudo eliminar.');
+            }
+        } finally {
+            setConfirmState(null);
+        }
+    };
+
+    const startEdit = (p: Product) => {
+        setEditingId(p.id);
+        setEditPrice(p.price.toString());
+        const realPoints = p.points_earned !== undefined && p.points_earned !== null ? p.points_earned : (p.points || 0);
+        setEditPoints(realPoints.toString());
+        setEditVisible(!!p.is_visible);
+        setEditImage(null); 
+    };
+
+    const saveEdit = async (id: number) => {
+        if (Number(editPrice) < 0 || Number(editPoints) < 0) return showAlert('error', 'Error', 'No negativos.');
+        try {
+            const payload: any = { price: parseFloat(editPrice), points: parseFloat(editPoints), is_visible: editVisible };
+            if (editImage) payload.image = editImage;
+            await updateProduct(id, payload);
+            setEditingId(null); setEditImage(null); onRulesChange(); 
+            showAlert('success', 'Actualizado', 'Producto editado correctamente.');
+        } catch (error) { console.error(error); const err = error as any; showAlert('error', 'Error', err.message || 'No se pudo actualizar.'); }
+    };
+
+    const calculatePoints = () => {
+        const amount = parseFloat(looseAmount) || 0;
+        if (selectedRule === 'manual') return parseFloat(manualPoints) || 0;
+        const rule = rules.find(r => r.id.toString() === selectedRule);
+        if (!rule) return amount / 3.0; 
+        return (amount / rule.amount_required) * rule.points_awarded;
+    };
+
+    // ✅ FUNCIÓN CORREGIDA PARA IMÁGENES
+    const getPackImage = (pack: any) => {
+        // 1. Intentar obtener el campo que tenga datos
+        let path = pack.image_url || pack.image_path || pack.image;
+        
+        if (!path) return null;
+
+        // 2. Si es una URL completa (ej: Cloudinary o S3), devolverla directo
+        if (typeof path === 'string' && path.startsWith('http')) return path;
+
+        // 3. Limpieza: Si la base de datos guardó "public/packs/foto.jpg", 
+        // debemos quitar "public/" para que la URL sea "storage/packs/foto.jpg"
+        path = path.replace('public/', '');
+
+        // 4. Construir URL local (Asegúrate que tu backend corre en el puerto 8000)
+        return `http://127.0.0.1:8000/storage/${path}`;
+    };
+
     return (
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full min-h-[600px] relative">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 h-full flex flex-col overflow-hidden relative">
             
-            {/* Toast */}
-            <div className={`absolute top-4 right-4 z-[60] transition-all duration-500 ${toast.show ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0 pointer-events-none'}`}>
-                <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border border-gray-100 bg-white min-w-[280px] border-l-4 ${toast.type === 'success' ? 'border-l-green-500' : 'border-l-red-500'}`}>
-                    <p className="text-sm font-bold text-gray-800">{toast.message}</p>
-                </div>
+            {/* ALERTAS Y MODALES */}
+            {alertState?.show && <CustomAlert type={alertState.type} title={alertState.title} message={alertState.msg} onClose={() => setAlertState(null)} />}
+            {confirmState?.show && <ConfirmModal title="¿Eliminar Ítem?" message="¿Estás seguro de que deseas eliminar este ítem? Esta acción no se puede deshacer." onConfirm={confirmDelete} onCancel={() => setConfirmState(null)} />}
+
+            {/* TABS */}
+            <div className="flex border-b border-gray-100 shrink-0">
+                <button onClick={() => setActiveTab('catalog')} className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'catalog' ? 'text-green-600 border-b-2 border-green-500 bg-green-50/50' : 'text-gray-400 hover:text-gray-600'}`}><Package className="w-4 h-4"/> Catálogo</button>
+                <button onClick={() => setActiveTab('packs')} className={`flex-1 py-4 text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'packs' ? 'text-purple-600 border-b-2 border-purple-500 bg-purple-50/50' : 'text-gray-400 hover:text-gray-600'}`}><Layers className="w-4 h-4"/> Packs</button>
             </div>
 
-            {/* --- MODAL DETALLE --- */}
-            {viewProduct && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden max-h-[90vh] flex flex-col md:flex-row relative animate-in zoom-in-95 duration-200">
-                        <button onClick={() => setViewProduct(null)} className="absolute top-4 right-4 z-20 p-2 bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-red-500 rounded-full transition-colors"><X className="w-5 h-5"/></button>
-
-                        <div className="w-full md:w-1/2 bg-gray-50 p-8 flex items-center justify-center relative border-b md:border-b-0 md:border-r border-gray-100">
-                            {viewProduct.image_url ? (
-                                <img src={viewProduct.image_url} alt={viewProduct.name} className="w-full h-auto max-h-[400px] object-contain drop-shadow-md mix-blend-multiply" />
-                            ) : (
-                                <div className="text-gray-300 flex flex-col items-center"><Package className="w-40 h-40 mb-4 opacity-50"/><p className="text-sm font-medium text-gray-400">Sin imagen disponible</p></div>
-                            )}
-                        </div>
-
-                        <div className="w-full md:w-1/2 p-8 flex flex-col overflow-y-auto bg-white">
-                            <h2 className="text-3xl font-extrabold text-gray-900 leading-tight mb-2">{viewProduct.name}</h2>
-                            <div className="mb-4"><span className="text-4xl font-black text-gray-900 tracking-tight">S/ {Number(viewProduct.price).toFixed(2)}</span></div>
-                            <div className="mb-2"><span className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm font-bold border border-green-100"><CheckCircle className="w-4 h-4 fill-green-200 text-green-600"/> Por esta compra ganas {getPoints(viewProduct).toFixed(2)} puntos.</span></div>
-                            <div className="mb-6 flex items-center gap-2 text-sm font-medium text-gray-500">
-                                {viewProduct.stock && viewProduct.stock > 0 ? (
-                                    <span className="text-green-600 flex items-center gap-1.5 font-bold"><CheckCircle className="w-4 h-4"/> En stock ({viewProduct.stock} disponibles)</span>
-                                ) : (
-                                    <span className="text-red-500 flex items-center gap-1.5 font-bold"><Ban className="w-4 h-4"/> Agotado</span>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-8 pb-6 border-b border-gray-100">
-                                <div>
-                                    <p className="text-xs text-gray-400 uppercase font-bold mb-1">Tipo de producto</p>
-                                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Tag className="w-3.5 h-3.5 text-blue-500"/> {viewProduct.type === 'course' ? 'Curso / Servicio' : 'Producto Físico'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-400 uppercase font-bold mb-1">Unidad de medida</p>
-                                    <p className="text-sm font-semibold text-gray-800 flex items-center gap-2"><Box className="w-3.5 h-3.5 text-purple-500"/> {viewProduct.unit_type || 'Unidad'}</p>
-                                </div>
-                            </div>
-
-                            <button onClick={() => { onAddProduct(viewProduct); setViewProduct(null); showToast("Producto agregado al carrito", 'success'); }} className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 active:scale-[0.98] mb-8">
-                                <ShoppingCart className="w-5 h-5"/> Agregar al carrito
-                            </button>
-
-                            <div>
-                                <h3 className="text-base font-bold text-gray-900 mb-2">Descripción del producto</h3>
-                                <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{viewProduct.description || "Sin descripción detallada."}</div>
-                            </div>
-                        </div>
-                    </div>
+            {/* CONTENIDO SCROLLABLE */}
+            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar space-y-6 pb-60 sm:pb-48"> 
+                <div className="relative">
+                    <Search className="absolute left-4 top-3.5 text-gray-400 w-4 h-4" />
+                    <input type="text" placeholder={activeTab === 'catalog' ? "Buscar producto..." : "Buscar pack..."} className="w-full pl-10 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-green-100 outline-none text-gray-700 font-medium placeholder-gray-400 transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-            )}
 
-            {/* HEADER DE GESTIÓN (CREACIÓN RÁPIDA) */}
-            <div className="catalog-header bg-gray-50 p-5 border-b border-gray-200 min-h-[88px] flex flex-col justify-center transition-colors duration-300" style={{ backgroundColor: idToEdit ? '#fffbeb' : '#f9fafb' }}>
-                
                 {activeTab === 'catalog' && (
                     <>
-                        <div className="flex items-center justify-between mb-3"> 
-                            <div className="flex items-center gap-2">
-                                {idToEdit ? <Pencil className="w-4 h-4 text-amber-600" /> : <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                                <h3 className={`text-xs font-bold uppercase tracking-wider ${idToEdit ? 'text-amber-700' : 'text-gray-500'}`}>
-                                    {idToEdit ? 'Editando Producto' : 'Creación Rápida / Manual'}
-                                </h3> 
+                        <div className="bg-orange-50/50 rounded-2xl p-4 border border-orange-100">
+                            <div className="flex justify-between items-center mb-3 cursor-pointer" onClick={() => setShowQuickCreate(!showQuickCreate)}>
+                                <h4 className="text-xs font-bold text-orange-600 uppercase flex items-center gap-2"><Plus className="w-3 h-3"/> Creación Rápida</h4>
+                                {showQuickCreate ? <X className="w-4 h-4 text-orange-400"/> : <Plus className="w-4 h-4 text-orange-400"/>}
                             </div>
-                            {idToEdit && (
-                                <button onClick={handleCancelEdit} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 font-medium">
-                                    <Ban className="w-3 h-3"/> Cancelar
-                                </button>
+                            {showQuickCreate && (
+                                <div className="animate-in slide-in-from-top-2 flex flex-col sm:flex-row gap-3 items-start">
+                                    <div onClick={() => prodFileInputRef.current?.click()} className="w-full sm:w-20 h-20 bg-white rounded-xl border-2 border-dashed border-orange-200 hover:border-orange-400 flex items-center justify-center cursor-pointer shrink-0 overflow-hidden relative group">
+                                        <input type="file" ref={prodFileInputRef} className="hidden" accept="image/*" onChange={e => setProdImage(e.target.files?.[0] || null)} />
+                                        {prodImage ? <img src={URL.createObjectURL(prodImage)} className="w-full h-full object-cover" /> : <Camera className="w-6 h-6 text-orange-300 group-hover:text-orange-500 transition-colors" />}
+                                        {prodImage && <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Edit className="w-4 h-4 text-white"/></div>}
+                                    </div>
+                                    <div className="flex-1 w-full space-y-3">
+                                        <div className="flex gap-2">
+                                            <input value={prodName} onChange={e => setProdName(e.target.value)} placeholder="Nombre" className="flex-1 p-2 rounded-lg border border-orange-200 text-sm focus:border-orange-400 outline-none" />
+                                            <button onClick={() => setProdVisible(!prodVisible)} className={`p-2 rounded-lg border transition-all ${prodVisible ? 'bg-green-50 border-green-200 text-green-600' : 'bg-gray-100 border-gray-200 text-gray-400'}`} title={prodVisible ? "Visible" : "Oculto"}>
+                                                {prodVisible ? <Eye className="w-5 h-5"/> : <EyeOff className="w-5 h-5"/>}
+                                            </button>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1"><span className="absolute left-2 top-2 text-xs font-bold text-gray-400">S/</span><input type="number" min="0" value={prodPrice} onChange={e => setProdPrice(e.target.value)} placeholder="0.00" className="w-full pl-6 p-2 rounded-lg border border-orange-200 text-sm focus:border-orange-400 outline-none" /></div>
+                                            <div className="relative flex-1"><span className="absolute left-2 top-2 text-xs font-bold text-amber-500">Pts</span><input type="number" min="0" value={prodPoints} onChange={e => setProdPoints(e.target.value)} placeholder="0.00" className="w-full pl-8 p-2 rounded-lg border border-orange-200 text-sm focus:border-orange-400 outline-none" /></div>
+                                        </div>
+                                        <button onClick={handleSaveProduct} disabled={isCreating} className="w-full bg-orange-500 text-white px-4 py-2.5 rounded-lg font-bold text-xs hover:bg-orange-600 shadow-sm transition-colors">{isCreating ? '...' : 'Crear Producto'}</button>
+                                    </div>
+                                </div>
                             )}
                         </div>
 
-                        {/* FILA 1: Nombre */}
-                        <div className="flex flex-col gap-3 mb-3">
-                            <input type="text" placeholder="Nombre Producto" className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm outline-none focus:border-green-500" value={prodName} onChange={(e) => setProdName(e.target.value)} />
-                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                            {loading ? <p className="text-center text-gray-400 col-span-full py-4">Cargando catálogo...</p> : 
+                             // @ts-ignore
+                             paginatedItems.map((product: Product) => {
+                                const displayPoints = product.points_earned !== undefined && product.points_earned !== null ? Number(product.points_earned) : Number(product.points || 0);
+                                return (
+                                <div key={product.id} className={`group bg-white border border-gray-100 hover:border-green-200 p-3 rounded-2xl transition-all hover:shadow-md flex flex-col justify-between relative overflow-hidden ${!product.is_visible && editingId !== product.id ? 'opacity-60 bg-gray-50' : ''}`}>
+                                    
+                                    {!product.is_visible && editingId !== product.id && <div className="absolute top-2 left-2 bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-10"><EyeOff className="w-3 h-3"/> Oculto</div>}
 
-                        {/* FILA 2: Precio, Puntos, Visibilidad, Botón */}
-                        <div className="flex flex-col sm:flex-row gap-3 mb-3">
-                            <div className="relative flex-1">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">S/</span>
-                                <input type="number" placeholder="Precio" className="w-full border border-gray-300 rounded-xl pl-8 pr-2 py-2 text-sm outline-none focus:border-green-500" value={prodPrice} onChange={(e) => handlePriceChange(e.target.value)} />
-                            </div>
+                                    <div className="absolute top-0 right-0 p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex gap-1 z-10 bg-white/80 backdrop-blur-sm rounded-bl-2xl">
+                                        <button onClick={() => startEdit(product)} className="p-1.5 bg-white shadow rounded-lg text-blue-400 hover:bg-blue-50 hover:text-blue-600 border border-gray-100"><Edit className="w-3.5 h-3.5"/></button>
+                                        <button onClick={() => requestDelete(product.id, 'product')} className="p-1.5 bg-white shadow rounded-lg text-red-300 hover:bg-red-50 hover:text-red-500 border border-gray-100"><Trash2 className="w-3.5 h-3.5"/></button>
+                                    </div>
 
-                            <div className="relative flex-1">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-amber-500 font-bold">Pts</span>
-                                <input type="number" placeholder="Pts" className="w-full border border-amber-200 bg-amber-50 rounded-xl pl-8 pr-2 py-2 text-sm outline-none focus:border-amber-500 font-bold text-amber-700" value={prodPoints} onChange={(e) => setProdPoints(e.target.value)} />
-                            </div>
-
-                            <button onClick={() => setIsVisible(!isVisible)} className={`px-3 rounded-xl border transition-all flex items-center justify-center ${isVisible ? 'bg-white border-green-200 text-green-600 hover:bg-green-50' : 'bg-gray-100 border-gray-300 text-gray-400 hover:bg-gray-200'}`} title={isVisible ? "Visible" : "Oculto"}>
-                                {isVisible ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
-                            </button>
-
-                            <button onClick={handleSaveProduct} disabled={isProcessing} className={`px-4 py-2 rounded-xl text-sm font-bold text-white transition-colors min-w-[80px] ${idToEdit ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-black'}`}>
-                                {isProcessing ? '...' : (idToEdit ? 'Guardar' : 'Crear')}
-                            </button>
-                        </div>
-
-                        {/* FILA 3 (NUEVA): Descripción e Imagen */}
-                        <div className="flex gap-2 items-center">
-                            <input 
-                                type="text" 
-                                placeholder="Descripción (opcional)" 
-                                className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm outline-none focus:border-green-500"
-                                value={prodDescription}
-                                onChange={(e) => setProdDescription(e.target.value)}
-                            />
-
-                            <div className="relative">
-                                <input 
-                                    ref={fileInputRef}
-                                    type="file" 
-                                    id="catalog-img-upload" 
-                                    className="hidden" 
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            setProdImage(e.target.files[0]);
-                                        }
-                                    }}
-                                />
-                                <label 
-                                    htmlFor="catalog-img-upload" 
-                                    className={`cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap ${
-                                        prodImage 
-                                        ? 'bg-emerald-100 border-emerald-500 text-emerald-700' 
-                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    {prodImage ? <ImageIcon className="w-4 h-4"/> : <Camera className="w-4 h-4"/>}
-                                    <span className="text-xs font-medium hidden sm:inline">{prodImage ? 'Foto Lista' : 'Subir Foto'}</span>
-                                </label>
-                            </div>
-                            
-                            {prodImage && (
-                                <button onClick={() => { setProdImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><X className="w-4 h-4"/></button>
-                            )}
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className={`w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative cursor-pointer ${editingId === product.id ? 'ring-2 ring-green-400' : ''}`} onClick={() => editingId === product.id && editFileInputRef.current?.click()}>
+                                            {editingId === product.id && editImage ? <img src={URL.createObjectURL(editImage)} className="w-full h-full object-cover" /> : product.image_url ? <img src={product.image_url} className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-gray-300"/>}
+                                            {editingId === product.id && <div className="absolute inset-0 bg-black/40 flex items-center justify-center"><Upload className="w-4 h-4 text-white"/><input type="file" ref={editFileInputRef} className="hidden" accept="image/*" onChange={e => setEditImage(e.target.files?.[0] || null)} /></div>}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="font-bold text-gray-800 text-sm truncate" title={product.name}>{product.name}</h4>
+                                                {editingId === product.id && (
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); setEditVisible(!editVisible); }} className={`ml-2 p-1.5 rounded-lg border transition-all relative z-20 ${editVisible ? 'bg-green-50 border-green-200 text-green-600' : 'bg-gray-100 border-gray-200 text-gray-400'}`} title={editVisible ? "Visible" : "Oculto"}>
+                                                        {editVisible ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {editingId === product.id ? (<div className="flex items-center gap-1 mt-1"><input type="number" min="0" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="w-16 text-xs border rounded px-1 font-bold" /><button onClick={() => saveEdit(product.id)} className="text-green-600 bg-green-50 p-1 rounded hover:bg-green-100"><CheckSquare className="w-3 h-3"/></button></div>) : (<p className="text-xs text-gray-500 font-medium">S/ {Number(product.price).toFixed(2)}</p>)}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
+                                        <div className="text-xs font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-lg">{editingId === product.id ? <input type="number" min="0" value={editPoints} onChange={e => setEditPoints(e.target.value)} className="w-12 bg-transparent outline-none border-b border-amber-300" /> : `+${displayPoints.toFixed(2)} pts`}</div>
+                                        <button onClick={() => onAddProduct(product)} className="w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-500 hover:text-white transition-colors"><Plus className="w-4 h-4"/></button>
+                                    </div>
+                                </div>
+                            )})}
                         </div>
                     </>
                 )}
 
                 {activeTab === 'packs' && (
-                    <div className="flex items-center justify-between w-full">
-                        <div>
-                            <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2"><Layers className="w-4 h-4"/> Gestión de Packs</h3>
-                            <p className="text-xs text-purple-600 mt-0.5">Crea packs con lógica de puntos personalizada.</p>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-purple-50 p-4 rounded-xl border border-purple-100">
+                            <div><h3 className="text-sm font-bold text-purple-900">Gestión de Packs</h3><p className="text-xs text-purple-600 hidden sm:block">Crea packs con lógica.</p></div>
+                            <button onClick={onSaveCartAsPack} className="px-4 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl hover:bg-purple-700 shadow-md flex items-center gap-2"><Save className="w-3.5 h-3.5"/> Nuevo Pack</button>
                         </div>
-                        <button onClick={onSaveCartAsPack} className="bg-purple-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-purple-700 shadow-md shadow-purple-100 flex items-center gap-2 transition-all active:scale-95">
-                            <Save className="w-4 h-4"/> Guardar Carrito como Pack
+                        <div className="grid grid-cols-1 gap-3 pb-2">
+                            {/* @ts-ignore */}
+                            {paginatedItems.map((pack: Pack) => {
+                                // ✅ Usamos la nueva función corregida
+                                const packImg = getPackImage(pack);
+                                return (
+                                <div key={pack.id} className="bg-white border border-gray-100 p-4 rounded-2xl flex items-center justify-between group hover:border-purple-200 transition-all hover:shadow-md relative">
+                                    
+                                    <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex gap-1 bg-white/80 rounded-lg p-1">
+                                        <button onClick={() => onEditPack(pack)} className="p-1.5 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg"><Edit className="w-4 h-4"/></button>
+                                        <button onClick={() => requestDelete(pack.id, 'pack')} className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center text-purple-400 shrink-0 overflow-hidden">
+                                            {packImg ? (
+                                                <img 
+                                                    src={packImg} 
+                                                    className="w-full h-full object-cover rounded-xl"
+                                                    onError={(e) => {
+                                                        // Fallback si la imagen falla al cargar: Ocultarla y mostrar placeholder
+                                                        e.currentTarget.style.display = 'none';
+                                                        console.log("Error cargando imagen:", packImg);
+                                                    }}
+                                                />
+                                            ) : <Layers className="w-6 h-6"/>}
+                                        </div>
+                                        <div className="min-w-0"><h4 className="font-bold text-gray-900 text-sm truncate">{pack.name}</h4><p className="text-xs text-gray-500">S/ {Number(pack.total_pack_price).toFixed(2)} • <span className="text-purple-600 font-bold">{Number(pack.total_pack_points).toFixed(2)} pts</span></p></div>
+                                    </div>
+                                    <div className="flex gap-2 mt-2 justify-end"><button onClick={() => onAddPack(pack)} className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-sm transition-colors"><Plus className="w-4 h-4"/></button></div>
+                                </div>
+                            )})}
+                        </div>
+                    </div>
+                )}
+
+                {/* CONTROLES DE PAGINACIÓN */}
+                {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-4 mt-4 py-2">
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        >
+                            <ChevronLeft className="w-5 h-5"/>
+                        </button>
+                        <span className="text-xs font-bold text-gray-500">
+                            Página {currentPage} de {totalPages}
+                        </span>
+                        <button 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        >
+                            <ChevronRight className="w-5 h-5"/>
                         </button>
                     </div>
                 )}
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-gray-100 overflow-x-auto no-scrollbar">
-                <button onClick={() => setActiveTab('catalog')} className={`flex-1 py-4 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 min-w-[100px] transition-colors ${activeTab === 'catalog' ? 'text-green-600 bg-white border-b-2 border-green-500' : 'text-gray-400 bg-gray-50 hover:bg-gray-100'}`}><Package className="w-4 h-4"/> Catálogo</button>
-                <button onClick={() => setActiveTab('packs')} className={`flex-1 py-4 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 min-w-[100px] transition-colors ${activeTab === 'packs' ? 'text-purple-600 bg-white border-b-2 border-purple-500' : 'text-gray-400 bg-gray-50 hover:bg-gray-100'}`}><Layers className="w-4 h-4"/> Packs</button>
+            {/* VENTA LIBRE */}
+            <div className="absolute bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-between items-center mb-3"><h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><Filter className="w-3 h-3"/> Venta Libre / Abarrotes</h3></div>
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        <input value={looseDesc} onChange={e => setLooseDesc(e.target.value)} className="col-span-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:border-green-400 outline-none" placeholder="Descripción (Ej. Arroz)" />
+                        <div className="relative"><span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">S/</span><input type="number" min="0" value={looseAmount} onChange={e => setLooseAmount(e.target.value)} className="w-full pl-8 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 text-sm focus:border-green-400 outline-none font-bold" placeholder="0.00" /></div>
+                        <div className="flex gap-2">
+                            <select value={selectedRule} onChange={e => setSelectedRule(e.target.value)} className="flex-1 px-2 py-2 bg-gray-50 rounded-xl border border-gray-200 text-xs focus:border-green-400 outline-none appearance-none font-medium text-gray-600 truncate">
+                                <option value="manual">Puntos Manuales</option>
+                                {rules.map(r => (<option key={r.id} value={r.id}>{r.name}</option>))}
+                            </select>
+                            <button onClick={() => setShowRuleModal(true)} className="px-3 bg-gray-800 text-white rounded-xl hover:bg-black transition-colors" title="Crear nueva regla"><Plus className="w-4 h-4"/></button>
+                        </div>
+                    </div>
+                    {selectedRule === 'manual' && (<div className="animate-in fade-in zoom-in-95 duration-200"><input type="number" min="0" value={manualPoints} onChange={e => setManualPoints(e.target.value)} className="w-full px-3 py-2 bg-amber-50 rounded-xl border border-amber-200 text-sm focus:border-amber-400 outline-none text-amber-900 placeholder-amber-400" placeholder="Ingresar puntos manualmente" /></div>)}
+                    <button onClick={() => { if (parseFloat(looseAmount) < 0 || (selectedRule === 'manual' && parseFloat(manualPoints) < 0)) return showAlert('error', 'Valor Negativo', 'No se permiten valores negativos.'); onAddLooseItem(parseFloat(looseAmount), looseDesc, selectedRule, calculatePoints()); setLooseAmount(''); setLooseDesc('Abarrotes'); setManualPoints(''); }} className="w-full py-3.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg"><Plus className="w-4 h-4"/> Agregar a Carrito</button>
+                </div>
             </div>
 
-            <div className="p-5 flex-1 overflow-y-auto max-h-[600px] custom-scrollbar relative">
-                
-                {/* 1. CATÁLOGO */}
-                {activeTab === 'catalog' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Buscar producto..." className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-100 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                        {loading ? <div className="text-center py-10 text-gray-400"><Loader2 className="w-6 h-6 animate-spin mx-auto"/> Cargando...</div> : (
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {filteredProducts.map(product => {
-                                    const safePoints = getPoints(product);
-                                    const isHidden = product.is_visible === false || product.is_visible === 0;
-
-                                    return (
-                                        <div key={product.id} onClick={() => onAddProduct(product)} className={`group border rounded-xl p-3 hover:shadow-md cursor-pointer transition-all flex flex-col justify-between h-auto relative ${isHidden ? 'bg-gray-50 border-dashed border-gray-300' : 'bg-white border-gray-100 hover:border-green-500'}`}>
-                                            <div className="absolute top-2 right-2 flex gap-1 z-10">
-                                                <button onClick={(e) => { e.stopPropagation(); setViewProduct(product); }} className="p-1.5 bg-gray-100 text-blue-500 rounded-full opacity-0 group-hover:opacity-100 hover:bg-blue-100 hover:text-blue-700 transition-all" title="Ver Detalles"><Info className="w-3.5 h-3.5"/></button>
-                                                <button onClick={(e) => handleEditProductClick(e, product)} className="p-1.5 bg-gray-100 text-gray-400 rounded-full opacity-0 group-hover:opacity-100 hover:bg-amber-100 hover:text-amber-600 transition-all" title="Editar"><Pencil className="w-3.5 h-3.5"/></button>
-                                            </div>
-                                            
-                                            <div className="flex gap-3 mb-2">
-                                                <div className="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-100">
-                                                    {product.image_url ? (
-                                                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = ''; e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('fallback'); }} />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-300"><Package className="w-6 h-6"/></div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className={`text-xs sm:text-sm font-bold leading-tight mb-1 line-clamp-2 ${isHidden ? 'text-gray-500' : 'text-gray-700 group-hover:text-green-700'}`}>{product.name}</h4>
-                                                    {isHidden && <span className="text-[9px] bg-gray-200 text-gray-500 px-1.5 rounded inline-flex items-center gap-1"><EyeOff className="w-3 h-3"/> Oculto</span>}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="mt-1 flex items-end justify-between border-t pt-2 border-dashed border-gray-100">
-                                                <div><div className="text-[10px] text-gray-400 uppercase">Precio</div><div className="font-mono font-bold text-gray-900">S/ {Number(product.price).toFixed(2)}</div></div>
-                                                <div className="text-right mx-2"><div className="text-[10px] text-gray-400 uppercase">Pts</div><div className="font-bold text-amber-600">{safePoints.toFixed(2)}</div></div>
-                                                <div className="bg-green-50 text-green-700 p-1.5 rounded-lg group-hover:bg-green-500 group-hover:text-white transition-colors"><Plus className="w-4 h-4"/></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+            {/* MODAL NUEVA REGLA (Fixed Full) */}
+            {showRuleModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-200 p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-gray-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+                        <div className="bg-gradient-to-r from-gray-50 to-white p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10">
+                            <div><h3 className="text-lg font-extrabold text-gray-800 flex items-center gap-2"><div className="p-2 bg-purple-100 rounded-lg text-purple-600"><Calculator className="w-5 h-5"/></div>Nueva Regla</h3><p className="text-xs text-gray-500 mt-1 ml-1">Define una nueva tasa.</p></div>
+                            <button onClick={() => setShowRuleModal(false)} className="p-2 bg-white rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 shadow-sm border border-gray-100 transition-all"><X className="w-5 h-5"/></button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div className="space-y-1.5"><label className="text-xs font-bold text-gray-700 uppercase tracking-wider ml-1">Nombre</label><input value={newRuleName} onChange={e => setNewRuleName(e.target.value)} className="w-full pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all placeholder:text-gray-400" placeholder="Ej. Promo Verano" autoFocus /></div>
+                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center gap-3 relative"><div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-1.5 rounded-full shadow-sm border border-gray-100 z-10"><ArrowRight className="w-4 h-4 text-gray-400"/></div><div className="flex-1 space-y-1.5"><label className="text-[10px] font-bold text-gray-400 uppercase text-center block">Venta (S/)</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">S/</span><input type="number" value={newRuleMoney} onChange={e => setNewRuleMoney(e.target.value)} className="w-full pl-8 pr-2 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center font-bold text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" placeholder="3.00"/></div></div><div className="w-4"></div><div className="flex-1 space-y-1.5"><label className="text-[10px] font-bold text-gray-400 uppercase text-center block">Puntos</label><div className="relative"><input type="number" value={newRulePoints} onChange={e => setNewRulePoints(e.target.value)} className="w-full pl-2 pr-8 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-center font-bold text-green-600 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 outline-none transition-all" placeholder="1.00"/><span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 font-bold text-xs">Pts</span></div></div></div>
+                            <button onClick={handleCreateRule} className="w-full py-3.5 bg-gray-900 text-white rounded-xl font-bold text-sm shadow-lg shadow-gray-900/20 hover:bg-black hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"><Save className="w-4 h-4"/> Guardar Nueva Regla</button>
+                        </div>
                     </div>
-                )}
-
-                {/* 2. PACKS */}
-                {activeTab === 'packs' && (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                         <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" placeholder="Buscar pack..." className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-100 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                        {filteredPacks.length === 0 ? (
-                            <div className="text-center py-10 flex flex-col items-center justify-center"><Layers className="w-12 h-12 text-gray-200 mb-2"/><p className="text-gray-400 text-sm">No hay packs registrados.</p><p className="text-xs text-purple-500 mt-2 max-w-[200px]">Agrega productos al carrito y dale al botón de arriba "Guardar Carrito como Pack".</p></div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {filteredPacks.map(pack => {
-                                    const isActive = pack.status !== 'inactive'; 
-                                    return (
-                                    <div key={pack.id} onClick={() => isActive && onAddPack(pack)} className={`group border rounded-xl p-4 transition-all relative ${isActive ? 'border-gray-100 bg-white hover:border-purple-500 hover:shadow-md cursor-pointer' : 'border-gray-100 bg-gray-50 opacity-70 cursor-default'}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex-1 pr-2"><h4 className="font-bold text-gray-800 group-hover:text-purple-700 leading-tight text-sm">{pack.name}</h4>{!isActive && <span className="text-[10px] bg-gray-200 text-gray-500 px-1.5 rounded mt-1 inline-block">INACTIVO</span>}</div>
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={(e) => handleTogglePack(e, pack.id)} className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-green-500 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-200'}`} title={isActive ? "Desactivar" : "Activar"}>{isActive ? (<span>ON</span>) : (<span>OFF</span>)}</button>
-                                                <button onClick={(e) => handleEditClick(e, pack)} className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar"><Layers className="w-3.5 h-3.5"/></button>
-                                                <button onClick={(e) => handleDeletePack(e, pack.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">X</button>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-between items-end mt-3 border-t border-dashed border-gray-100 pt-2">
-                                            <div><p className="text-[10px] text-gray-400 uppercase">Precio Pack</p><p className="font-mono font-bold text-base text-gray-900">S/ {Number(pack.total_pack_price).toFixed(2)}</p></div>
-                                            <div className="text-right"><p className="text-[10px] text-gray-400 uppercase">Puntos</p><p className="font-bold text-purple-600 text-sm">{Number(pack.total_pack_points).toFixed(2)} pts</p></div>
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 };
