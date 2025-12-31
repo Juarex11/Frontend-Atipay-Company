@@ -58,4 +58,4 @@ export const getMyAffiliates = async (): Promise<RankingUser[]> => {
 
   return handleResponse<RankingUser[]>(response);
 };
-};
+
