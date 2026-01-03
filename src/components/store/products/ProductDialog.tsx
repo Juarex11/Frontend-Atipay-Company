@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Heart, ShoppingCart, Clock, User, Info, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+// ✅ Agregamos DialogDescription al import
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import type { Product } from "../types/store.types";
 import { productService } from "@/services/productService";
@@ -90,6 +91,10 @@ export function ProductDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl">
+          {/* ✅ Corrección de Accesibilidad para Loading */}
+          <DialogTitle className="sr-only">Cargando producto</DialogTitle>
+          <DialogDescription className="sr-only">Por favor espere mientras se cargan los detalles</DialogDescription>
+          
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2">Cargando detalles del producto...</span>
@@ -181,6 +186,11 @@ export function ProductDialog({
                     )}
                   </div>
                   <DialogTitle className="text-3xl font-bold text-gray-900">{product.name}</DialogTitle>
+                  
+                  {/* ✅ Corrección de Accesibilidad: DialogDescription agregado */}
+                  <DialogDescription className="text-gray-500 mt-1">
+                    Vista detallada de {product.name}
+                  </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
