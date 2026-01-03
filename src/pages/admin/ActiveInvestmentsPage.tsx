@@ -3,22 +3,6 @@ import { getActiveInvestmentsSummaryForAdmin } from "../../services/investmentSe
 import type { InvestmentSummary } from "../../services/investmentService";
 import { FiSearch } from "react-icons/fi";
 
-// Calcula días transcurridos desde una fecha hasta hoy
-const getDiasTranscurridos = (fechaInicio: string): number => {
-  if (!fechaInicio) return 0;
-
-  const inicio = new Date(fechaInicio + "T00:00:00");
-  const hoy = new Date();
-
-  // Ajustar zonas horarias para evitar desfases
-  inicio.setHours(0, 0, 0, 0);
-  hoy.setHours(0, 0, 0, 0);
-
-  const diff = hoy.getTime() - inicio.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
-};
-
-
 const ActiveInvestmentsPage: React.FC = () => {
   const [data, setData] = useState<InvestmentSummary[]>([]);
   const [filteredData, setFilteredData] = useState<InvestmentSummary[]>([]);
@@ -55,7 +39,6 @@ const ActiveInvestmentsPage: React.FC = () => {
       )
     );
   };
-  console.log("DATA DEL BACKEND:", filteredData);
 
   return (
     <div className="p-6">
@@ -111,15 +94,15 @@ const ActiveInvestmentsPage: React.FC = () => {
                   <td className="px-4 py-3">{item.promocion_nombre}</td>
 
                   <td className="px-4 py-3 font-semibold text-green-700">
-                    ${item.monto_invertido}
+                    S/ {item.monto_invertido}
                   </td>
 
                   <td className="px-4 py-3 text-blue-700">
-                    ${item.retorno_diario_calculado}
+                    S/ {item.retorno_diario_calculado}
                   </td>
 
                   <td className="px-4 py-3 text-orange-700">
-                    ${item.retorno_total_generado}
+                    S/ {item.retorno_total_generado}
                   </td>
                   <td className="px-4 py-3">
                     {item.fecha_inicio}

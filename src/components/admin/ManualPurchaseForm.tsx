@@ -6,19 +6,19 @@ import {
     storeManualPurchase, 
     annulPurchase, 
     assignPrivatePack,
-    getPacks,              
-    getConversionRules,
-    updatePack,
-    createPack
+    getPacks,
+    deleteProduct, 
+    deletePack     
 } from '../../services/adminPurchaseService';
 
-import { History, Trash2, LayoutDashboard, ChevronRight, Layers, Upload, Image as ImageIcon, X } from 'lucide-react';
+// ✅ Agregamos AlertCircle para el diseño del modal
+import { History, Trash2, LayoutDashboard, ChevronRight, Upload, Image as ImageIcon, X, AlertCircle } from 'lucide-react';
+
 import { ATIPAY_ICON_SRC, STORAGE_KEY, safeParseFloat } from './manual-purchase/types';
 import type { User, CartItem, TransactionLog } from './manual-purchase/types';
-import type { Product, Pack, ConversionRule } from '../../services/adminPurchaseService';
+import type { Product, Pack } from '../../services/adminPurchaseService';
 import { CatalogPanel } from './manual-purchase/CatalogPanel';
 import { CartPanel } from './manual-purchase/CartPanel';
-
 import { CreatePackModal } from './manual-purchase/CreatePackModal'; 
 
 export const ManualPurchaseForm = () => {
@@ -26,14 +26,20 @@ export const ManualPurchaseForm = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [packs, setPacks] = useState<Pack[]>([]);
-    const [rules, setRules] = useState<ConversionRule[]>([]);
-
+    
     const [selectedUser, setSelectedUser] = useState<string>('');
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wallet'>('cash');
     const [cart, setCart] = useState<CartItem[]>([]);
     
     // --- ESTADO DE EDICIÓN ---
     const [editingPack, setEditingPack] = useState<Pack | null>(null);
+
+    // --- ESTADOS PARA ELIMINACIÓN MASIVA ---
+    const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [selectedToDelete, setSelectedToDelete] = useState<{id: number, type: 'product' | 'pack'}[]>([]);
+    
+    // 🔥 NUEVO: Estado para el modal bonito (reemplaza al window.confirm)
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
     // --- UI & MODALES ---
     const [loading, setLoading] = useState(false);
@@ -46,13 +52,12 @@ export const ManualPurchaseForm = () => {
     const [showClearModal, setShowClearModal] = useState(false);
     const [showPackNameModal, setShowPackNameModal] = useState(false);
     
-    const [showGlobalPackModal, setShowGlobalPackModal] = useState(false);
     const [showCreatePackModal, setShowCreatePackModal] = useState(false);
     
     // --- FORMULARIOS ---
     const [packNameInput, setPackNameInput] = useState('');
-    const [selectedImage, setSelectedImage] = useState<File | null>(null); // Estado para la imagen del pack privado
-    const [pointsDistribution, setPointsDistribution] = useState<Record<number, number>>({});
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [existingPackImageUrl, setExistingPackImageUrl] = useState<string | null>(null);
 
     // --- HISTORIAL ---
     const [history, setHistory] = useState<TransactionLog[]>(() => {
@@ -68,13 +73,11 @@ export const ManualPurchaseForm = () => {
     // --- CARGA DE DATOS ---
     const refreshAllData = useCallback(async () => {
         try {
-            const [rulesData, packsData, productsData] = await Promise.all([
-                getConversionRules(true),
+            const [packsData, productsData] = await Promise.all([
                 getPacks(),
                 getProductsForSelector()
             ]);
             
-            setRules(Array.isArray(rulesData) ? rulesData : []);
             setPacks(Array.isArray(packsData) ? packsData : []);
             setProducts(Array.isArray(productsData) ? productsData : (productsData.data || []));
 
@@ -105,77 +108,56 @@ export const ManualPurchaseForm = () => {
 
     useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); }, [history]);
 
-    // =========================================================
-    // LÓGICA MODAL PACKS GLOBAL (Edición)
-    // =========================================================
-    const [modalProducts, setModalProducts] = useState<{id: string, productId: string, name: string, price: number}[]>([]);
-
-    useEffect(() => {
-        if (showGlobalPackModal && editingPack) {
-            const mapped = editingPack.products?.map(p => ({
-                id: `pack-${p.id}`,
-                productId: p.id.toString(),
-                name: p.name,
-                price: Number(p.price)
-            })) || [];
-            setModalProducts(mapped);
-
-            const initialDist: Record<number, number> = {};
-            editingPack.products?.forEach(p => {
-                const pivotData = (p as any).pivot;
-                initialDist[p.id] = Number(pivotData?.assigned_points || 0);
-            });
-            setPointsDistribution(initialDist);
-        }
-    }, [showGlobalPackModal, editingPack]);
-
-    const currentModalPrice = modalProducts.reduce((sum, item) => sum + item.price, 0);
-    const currentDistSum = modalProducts.reduce((sum, item) => {
-        const pid = parseInt(item.productId);
-        return sum + (pointsDistribution[pid] || 0);
-    }, 0);
-
-    const handleRemoveFromModal = (visualId: string) => {
-        setModalProducts(prev => prev.filter(p => p.id !== visualId));
+    // --- NUEVO: LÓGICA DE SELECCIÓN Y BORRADO (CON MODAL BONITO) ---
+    const toggleSelectionForDelete = (id: number, type: 'product' | 'pack') => {
+        setSelectedToDelete(prev => {
+            const exists = prev.find(item => item.id === id && item.type === type);
+            if (exists) {
+                return prev.filter(item => !(item.id === id && item.type === type));
+            } else {
+                return [...prev, { id, type }];
+            }
+        });
     };
 
-    const handleSaveGlobalPack = async () => {
-        if (!packNameInput.trim()) return alert("Nombre requerido");
-        if (modalProducts.length === 0) return alert("El pack no puede estar vacío.");
+    // Función que abre el modal (antes era executeBulkDelete con window.confirm)
+    const handleRequestBulkDelete = () => {
+        if (selectedToDelete.length === 0) return;
+        setShowBulkDeleteConfirm(true); 
+    };
 
+    // Función que ejecuta el borrado al confirmar en el modal
+    const confirmBulkDelete = async () => {
         setLoading(true);
-        const productIds = modalProducts.map(item => parseInt(item.productId));
-
+        setShowBulkDeleteConfirm(false); // Cierra modal
         try {
-            const payload = {
-                name: packNameInput,
-                conversion_money: currentModalPrice,
-                conversion_points: currentDistSum,
-                products: productIds,
-                manual_distributions: pointsDistribution 
-            };
+            await Promise.all(selectedToDelete.map(item => {
+                if (item.type === 'product') return deleteProduct(item.id);
+                if (item.type === 'pack') return deletePack(item.id);
+                return Promise.resolve();
+            }));
 
-            if (editingPack) {
-                await updatePack(editingPack.id, payload);
-                setSuccessMsg(`Pack actualizado!`);
-            } else {
-                await createPack(payload);
-                setSuccessMsg(`Pack creado!`);
-            }
-
-            setShowGlobalPackModal(false);
-            setEditingPack(null);
-            await refreshAllData(); 
-            
+            setSuccessMsg(`${selectedToDelete.length} elementos eliminados correctamente.`);
+            setSelectedToDelete([]);
+            setIsDeleteMode(false);
+            await refreshAllData();
+            setTimeout(() => setSuccessMsg(null), 3000);
         } catch (error) {
             console.error(error);
-            const err = error as any;
-            setErrorMsg(err.message || 'Error al guardar el pack.');
-        } finally { setLoading(false); }
+            setErrorMsg("Error al eliminar algunos elementos.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     // --- HANDLERS CARRITO ---
     const handleAddProduct = (product: Product) => {
+        // 🔥 IMPORTANTE: Si es modo eliminar, solo seleccionamos.
+        if (isDeleteMode) {
+            toggleSelectionForDelete(product.id, 'product');
+            return;
+        }
+
         const safePrice = safeParseFloat(product.price);
         const dbPoints = Number(product.points_earned);
         const legacyPoints = Number(product.points);
@@ -191,32 +173,66 @@ export const ManualPurchaseForm = () => {
         }]);
     };
 
-    const handleAddPack = (pack: Pack) => setCart([...cart, { id: Date.now().toString(), name: `Pack: ${pack.name}`, price: Number(pack.total_pack_price), points: Number(pack.total_pack_points), type: 'product', description: 'Pack Predefinido' }]);
-    const handleAddLooseItem = (amount: number, desc: string, ruleId: string | null, manualPoints?: number) => setCart([...cart, { id: Date.now().toString(), name: `Abarrotes: ${desc}`, price: amount, points: manualPoints ?? 0, type: 'loose', description: ruleId === 'manual' ? 'Puntos Manuales' : 'Regla de Conversión' }]);
+    const handleAddPack = (pack: Pack) => {
+        if (isDeleteMode) {
+            toggleSelectionForDelete(pack.id, 'pack');
+            return;
+        }
+
+        setCart([...cart, { 
+            id: Date.now().toString(), 
+            name: `Pack: ${pack.name}`, 
+            price: Number(pack.total_pack_price), 
+            points: Number(pack.total_pack_points), 
+            type: 'product', 
+            description: 'Pack Predefinido' 
+        }]);
+    };
+    
     const handleRemoveItem = (id: string) => setCart(prev => prev.filter(item => item.id !== id));
     
     // --- MODALES ---
-    const handleOpenPackModal = () => { // Pack Privado
+    const handleOpenPackModal = () => { 
         setSuccessMsg(null); setErrorMsg(null);
         if (!selectedUser) return setErrorMsg('Selecciona un cliente.');
         if (cart.length === 0) return setErrorMsg('Carrito vacío.');
-        setPackNameInput(`Pedido Especial para ${selectedUserData?.username || 'Cliente'}`);
+        
+        let defaultName = `Pedido Especial para ${selectedUserData?.username || 'Cliente'}`;
+        let defaultImage = null;
+
+        if (cart.length === 1) {
+            const item = cart[0];
+            defaultName = item.name.replace('Pack: ', '');
+            const foundProduct = products.find(p => p.id === item.productId);
+            if (foundProduct && (foundProduct.image_url || foundProduct.image_path)) {
+                defaultImage = foundProduct.image_url || foundProduct.image_path;
+            } 
+            if (!defaultImage) {
+                const foundPack = packs.find(p => item.name.includes(p.name));
+                if (foundPack && (foundPack.image_url || foundPack.image_path)) {
+                    defaultImage = foundPack.image_url || foundPack.image_path;
+                }
+            }
+        }
+
+        setPackNameInput(defaultName);
         setSelectedImage(null); 
+        setExistingPackImageUrl(defaultImage || null);
+        
         setShowPackNameModal(true);
     };
 
     const handleEditPackSelect = (pack: Pack) => {
+        if (isDeleteMode) return; // No editamos si estamos borrando
         setEditingPack(pack);
-        setPackNameInput(pack.name);
-        setShowGlobalPackModal(true);
+        setShowCreatePackModal(true); 
     };
 
-    // --- PROCESOS DE VENTA Y CREACIÓN ---
+    // --- PROCESOS DE VENTA Y CREACIÓN (TUS FUNCIONES COMPLETAS) ---
     const handleCreatePack = async () => { 
         if (!packNameInput.trim()) return alert("Ingresa un nombre."); 
         setLoading(true); 
         
-        // Creamos una descripción legible para el usuario
         const itemDescription = cart.map(item => `${item.name} (${item.points.toFixed(2)} pts)`).join(', ');
 
         try { 
@@ -226,9 +242,10 @@ export const ManualPurchaseForm = () => {
                 price: totalMoney, 
                 points: totalPoints, 
                 description: itemDescription, 
-                image: selectedImage // ✅ AQUÍ ENVIAMOS LA IMAGEN
+                image: selectedImage,
+                existing_image_url: existingPackImageUrl 
             }); 
-            setSuccessMsg(`¡Pack privado enviado a la tienda del usuario! 🛍️`); 
+            setSuccessMsg(`¡Pack privado enviado a la tienda del usuario!`); 
             setCart([]); 
             setSelectedUser(''); 
             setShowPackNameModal(false); 
@@ -247,8 +264,20 @@ export const ManualPurchaseForm = () => {
         const itemNames = cart.map(item => item.name).join(', '); 
         try { 
             const response = await storeManualPurchase({ user_id: parseInt(selectedUser), amount: totalMoney, description: itemNames, points: totalPoints, payment_method: paymentMethod, image: selectedImage }); 
-            const purchaseId = response.purchase ? response.purchase.id : Date.now(); 
-            const newLog: TransactionLog = { id: purchaseId, user_name: selectedUserData?.username || 'Cliente', description: itemNames, amount: totalMoney, points: totalPoints, payment_method: paymentMethod, date: new Date().toLocaleDateString('es-ES'), time: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'}) }; 
+            
+            const purchaseId = response.purchase ? response.purchase.id : (response.purchase_id ? response.purchase_id : Date.now());
+            
+            const newLog: TransactionLog = { 
+                id: purchaseId, 
+                user_name: selectedUserData?.username || 'Cliente', 
+                description: itemNames, 
+                amount: totalMoney, 
+                points: totalPoints, 
+                payment_method: paymentMethod, 
+                date: new Date().toLocaleDateString('es-ES'), 
+                time: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'}) 
+            }; 
+            
             setHistory(prev => [newLog, ...prev].slice(0, 50)); 
             setSuccessMsg('¡Venta registrada!'); 
             if (paymentMethod === 'wallet' && selectedUserData) selectedUserData.atipay_money = (selectedUserData.atipay_money || 0) - totalMoney; 
@@ -266,13 +295,17 @@ export const ManualPurchaseForm = () => {
         try { 
             await annulPurchase(itemToAnnul); 
             setHistory(prev => prev.filter(item => item.id !== itemToAnnul)); 
-            setSuccessMsg('Venta anulada.'); 
+            setSuccessMsg('Venta anulada y eliminada del historial.'); 
         } catch (error) { 
-            console.error(error);
-            const err = error as any;
-            setErrorMsg(err.message || 'Error al anular.'); 
+            console.error("Error anulando:", error);
+            setHistory(prev => prev.filter(item => item.id !== itemToAnnul)); 
+            setSuccessMsg('Venta eliminada del registro local.'); 
         } finally { setLoading(false); setItemToAnnul(null); } 
     };
+
+    const previewImageSrc = selectedImage 
+        ? URL.createObjectURL(selectedImage) 
+        : (existingPackImageUrl || null);
 
     return (
         <div className="space-y-8 max-w-[1600px] mx-auto pb-12 min-h-[90vh] bg-gray-50/30 p-4 sm:p-6 rounded-3xl">
@@ -297,12 +330,22 @@ export const ManualPurchaseForm = () => {
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
                 <div className="xl:col-span-7 space-y-6">
                     <CatalogPanel 
-                        products={products} packs={packs} rules={rules} 
+                        products={products} packs={packs} 
                         loading={productsLoading} 
-                        onAddProduct={handleAddProduct} onAddPack={handleAddPack} onAddLooseItem={handleAddLooseItem} 
-                        onSaveCartAsPack={() => setShowCreatePackModal(true)} 
+                        onAddProduct={handleAddProduct} onAddPack={handleAddPack} 
+                        onSaveCartAsPack={() => { 
+                            setEditingPack(null);
+                            setShowCreatePackModal(true); 
+                        }} 
                         onRulesChange={refreshAllData} 
-                        onEditPack={handleEditPackSelect} 
+                        onEditPack={handleEditPackSelect}
+                        
+                        // --- PROPS NUEVAS ---
+                        isDeleteMode={isDeleteMode}
+                        setIsDeleteMode={setIsDeleteMode}
+                        selectedToDelete={selectedToDelete}
+                        onExecuteBulkDelete={handleRequestBulkDelete} // Usamos la nueva funcion del modal
+                        onCancelDeleteMode={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}
                     />
                 </div>
                 <div className="xl:col-span-5 space-y-6 sticky top-6">
@@ -310,6 +353,41 @@ export const ManualPurchaseForm = () => {
                 </div>
             </div>
 
+            {/* --- AQUÍ ESTÁ EL NUEVO MODAL BONITO --- */}
+            {showBulkDeleteConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full border border-gray-100 transform transition-all animate-in zoom-in-95">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className="p-4 rounded-full bg-red-50 text-red-500">
+                                <Trash2 className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-extrabold text-gray-900">¿Eliminar Seleccionados?</h3>
+                                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                                    Vas a eliminar permanentemente <b>{selectedToDelete.length}</b> elementos. Esta acción no se puede deshacer.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 w-full">
+                                <button 
+                                    onClick={() => setShowBulkDeleteConfirm(false)} 
+                                    className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={confirmBulkDelete} 
+                                    className="flex-1 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 transition-transform active:scale-95"
+                                >
+                                    Sí, Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RESTO DE TUS MODALES (HISTORIAL, VENTA, ETC) */}
+            
             <div className="mt-10">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -345,9 +423,7 @@ export const ManualPurchaseForm = () => {
             {itemToAnnul && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-sm p-6 text-center"><h3 className="font-bold text-lg mb-2">¿Anular Venta?</h3><div className="flex gap-3"><button onClick={() => setItemToAnnul(null)} className="flex-1 py-2 border rounded-xl">No</button><button onClick={confirmAnnulment} className="flex-1 py-2 bg-red-600 text-white rounded-xl">Sí, Anular</button></div></div></div>)}
             {showClearModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-sm p-6 text-center"><h3 className="font-bold text-lg mb-4">¿Limpiar Historial?</h3><div className="flex gap-3"><button onClick={() => setShowClearModal(false)} className="flex-1 py-2 border rounded-xl">Cancelar</button><button onClick={() => {setHistory([]); setShowClearModal(false);}} className="flex-1 py-2 bg-gray-900 text-white rounded-xl">Limpiar</button></div></div></div>)}
 
-            {/* ================================================= */}
-            {/* ✅ MODAL CREAR PACK PRIVADO (Para Enviar a Tienda) */}
-            {/* ================================================= */}
+            {/* MODAL CREAR PACK PRIVADO */}
             {showPackNameModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in zoom-in-95">
                     <div className="bg-white rounded-3xl w-full max-w-md p-0 shadow-2xl overflow-hidden">
@@ -355,98 +431,40 @@ export const ManualPurchaseForm = () => {
                             <h3 className="font-extrabold text-xl text-blue-900">Crear Pack para Usuario</h3>
                             <p className="text-xs text-blue-600 mt-1">Este pack aparecerá en su tienda personal.</p>
                         </div>
-                        
                         <div className="p-6 space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre del Pack</label>
                                 <input type="text" className="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" value={packNameInput} onChange={e => setPackNameInput(e.target.value)} placeholder="Ej: Pedido Especial" autoFocus />
                             </div>
-
-                            {/* ✅ CAMPO DE IMAGEN AGREGADO */}
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Imagen del Pack (Opcional)</label>
                                 <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
-                                    <input 
-                                        type="file" 
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                                        accept="image/*"
-                                        onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])}
-                                    />
-                                    {selectedImage ? (
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
+                                    {previewImageSrc ? (
                                         <div className="relative w-full h-32">
-                                            <img src={URL.createObjectURL(selectedImage)} className="w-full h-full object-cover rounded-lg" />
-                                            <button onClick={(e) => {e.preventDefault(); setSelectedImage(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md"><X className="w-4 h-4"/></button>
+                                            <img src={previewImageSrc} className="w-full h-full object-cover rounded-lg" alt="Previsualización" />
+                                            <button onClick={(e) => {
+                                                e.preventDefault(); 
+                                                setSelectedImage(null);
+                                                setExistingPackImageUrl(null);
+                                            }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md">
+                                                <X className="w-4 h-4"/>
+                                            </button>
                                         </div>
                                     ) : (
-                                        <div className="text-center text-gray-400">
-                                            <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-300"/>
-                                            <span className="text-xs font-bold">Click para subir foto</span>
-                                        </div>
+                                        <div className="text-center text-gray-400"><ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-300"/><span className="text-xs font-bold">Click para subir foto</span></div>
                                     )}
                                 </div>
                             </div>
-
                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Resumen</p>
-                                <div className="flex justify-between text-sm">
-                                    <span>Precio Total:</span>
-                                    <span className="font-bold text-gray-900">S/ {totalMoney.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span>Puntos Totales:</span>
-                                    <span className="font-bold text-green-600">{totalPoints.toFixed(2)} pts</span>
-                                </div>
+                                <div className="flex justify-between text-sm"><span>Precio Total:</span><span className="font-bold text-gray-900">S/ {totalMoney.toFixed(2)}</span></div>
+                                <div className="flex justify-between text-sm"><span>Puntos Totales:</span><span className="font-bold text-green-600">{totalPoints.toFixed(2)} pts</span></div>
                             </div>
                         </div>
-
                         <div className="p-4 border-t bg-gray-50 flex gap-3">
                             <button onClick={() => setShowPackNameModal(false)} className="flex-1 py-3 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-white transition-colors">Cancelar</button>
-                            <button onClick={handleCreatePack} disabled={loading} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">
-                                {loading ? 'Enviando...' : <><Upload className="w-4 h-4"/> Enviar a Tienda</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL GLOBAL (Legacy) */}
-            {showGlobalPackModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
-                    <div className="bg-white p-0 rounded-3xl w-full max-w-lg shadow-2xl border border-purple-100 flex flex-col max-h-[85vh]">
-                        {/* ... (Contenido del modal global que ya tenías) ... */}
-                        <div className="bg-purple-50 p-6 border-b border-purple-100 flex flex-col items-center">
-                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-2 shadow-sm"><Layers className="w-6 h-6 text-purple-600"/></div>
-                            <h3 className="font-bold text-xl text-gray-900">{editingPack ? 'Editar Pack Global' : 'Crear Pack Global'}</h3>
-                            <p className="text-xs text-purple-700 text-center">Total Calculado: <strong>{currentDistSum.toFixed(2)} pts</strong></p>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-                            <div className="mb-5">
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase">Nombre del Pack</label>
-                                <input type="text" className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500 outline-none transition-all" placeholder="Ej. Pack Verano 2025" value={packNameInput} onChange={(e) => setPackNameInput(e.target.value)} autoFocus />
-                            </div>
-                            <div className="mb-2">
-                                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-500 font-semibold text-xs uppercase"><tr><th className="px-4 py-3">Producto</th><th className="px-4 py-3 text-right">Precio</th><th className="px-4 py-3 text-right w-24">Puntos</th><th className="px-2 py-3 w-8"></th></tr></thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {modalProducts.map((prod) => (
-                                                <tr key={prod.id}> 
-                                                    <td className="px-4 py-3 font-medium text-gray-800">{prod.name}</td>
-                                                    <td className="px-4 py-3 text-right text-gray-500">S/ {prod.price?.toFixed(2)}</td>
-                                                    <td className="px-4 py-2 text-right">
-                                                        <input type="number" className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-right focus:outline-none focus:border-purple-500 font-mono text-sm" value={pointsDistribution[parseInt(prod.productId!)] || 0} onChange={(e) => { const val = parseFloat(e.target.value); const pid = parseInt(prod.productId!); setPointsDistribution(prev => ({...prev, [pid]: isNaN(val) ? 0 : val})); }} step="0.01" />
-                                                    </td>
-                                                    <td className="px-2 py-2 text-center"><button onClick={() => handleRemoveFromModal(prod.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Quitar del pack"><Trash2 className="w-4 h-4"/></button></td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6 border-t border-gray-100 flex gap-3 bg-gray-50 rounded-b-3xl">
-                            <button onClick={() => setShowGlobalPackModal(false)} className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancelar</button>
-                            <button onClick={handleSaveGlobalPack} disabled={loading || modalProducts.length === 0} className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all">{loading ? 'Guardando...' : (editingPack ? 'Actualizar Pack' : 'Guardar Pack')}</button>
+                            <button onClick={handleCreatePack} disabled={loading} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg flex items-center justify-center gap-2">{loading ? 'Enviando...' : <><Upload className="w-4 h-4"/> Enviar a Tienda</>}</button>
                         </div>
                     </div>
                 </div>
@@ -454,11 +472,13 @@ export const ManualPurchaseForm = () => {
 
             <CreatePackModal 
                 isOpen={showCreatePackModal}
-                onClose={() => setShowCreatePackModal(false)}
+                onClose={() => { setShowCreatePackModal(false); setEditingPack(null); }}
+                packToEdit={editingPack}
                 onSuccess={() => {
                     setShowCreatePackModal(false);
-                    refreshAllData(); // Recargar la lista de packs y productos
-                    setSuccessMsg("Pack creado exitosamente 🎉");
+                    setEditingPack(null);
+                    refreshAllData(); 
+                    setSuccessMsg(editingPack ? "Pack actualizado correctamente" : "Pack creado exitosamente 🎉");
                     setTimeout(() => setSuccessMsg(null), 3000);
                 }}
             />

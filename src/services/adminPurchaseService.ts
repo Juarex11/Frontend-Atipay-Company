@@ -35,6 +35,7 @@ export interface ManualPurchaseData {
     image?: File | null; 
 }
 
+// --- INTERFAZ ACTUALIZADA ---
 export interface PrivatePackData {
     user_id: number;
     name: string;
@@ -42,6 +43,7 @@ export interface PrivatePackData {
     points: number;
     description: string;
     image?: File | null; 
+    existing_image_url?: string | null; // Envío de URL como texto
 }
 
 export interface ConversionRule {
@@ -61,6 +63,7 @@ export interface CreatePackData {
 }
 
 export interface Pack {
+    image_url: string | undefined;
     id: number;
     name: string;
     conversion_factor_money: number;
@@ -122,49 +125,50 @@ export const annulPurchase = async (purchaseId: number) => {
     return data;
 };
 
-// --- PACKS PRIVADOS ---
+// --- PACKS PRIVADOS (CORREGIDO Y OPTIMIZADO) ---
 
-// En src/services/adminPurchaseService.ts
-
-export const assignPrivatePack = async (data: { 
-    user_id: number, 
-    name: string, 
-    price: number, 
-    points: number, 
-    description: string,
-    image?: File | null // ✅ Aceptamos imagen
-}) => {
-    // Usamos FormData para poder enviar la imagen
+export const assignPrivatePack = async (data: PrivatePackData) => {
     const formData = new FormData();
     formData.append('user_id', data.user_id.toString());
     formData.append('name', data.name);
     formData.append('price', data.price.toString());
-    formData.append('points_earned', data.points.toString()); // Asegúrate de que el backend espere 'points_earned' o 'points'
+    formData.append('points_earned', data.points.toString()); 
     formData.append('description', data.description);
     
-    // Estos campos ayudan al backend a identificarlo como pack privado
-    formData.append('type', 'pack'); 
+    // CORRECCIÓN IMPORTANTE: Cambiado de 'pack' a 'product' para pasar la validación
+    formData.append('type', 'product'); 
     formData.append('stock', '1');
     formData.append('is_visible', '1');
 
-    if (data.image) {
+    // LÓGICA DE IMAGEN V2: Cero descargas en frontend
+    if (data.image instanceof File) {
+        // Opción A: Subida manual
         formData.append('image', data.image);
+    } 
+    else if (data.existing_image_url) {
+        // Opción B: Enviar URL como texto para que el backend copie el archivo localmente
+        formData.append('existing_image_url', data.existing_image_url);
     }
 
-    const response = await fetch(`${API_URL}/products`, { // Creamos el pack como un producto especial
+    const response = await fetch(`${API_URL}/products`, { 
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            // NOTA: No ponemos 'Content-Type': 'application/json' porque FormData lo gestiona automáticamente
+            'Accept': 'application/json', // Evita redirecciones y errores de CORS
         },
         body: formData
     });
 
+    const result = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-        const result = await response.json().catch(() => ({}));
-        throw new Error(result.error || result.message || 'Error al asignar pack privado');
+        let errorMsg = result.message || result.error || 'Error al asignar pack privado';
+        if (result.errors) {
+            errorMsg = Object.values(result.errors).flat().join('\n');
+        }
+        throw new Error(errorMsg);
     }
-    return await response.json();
+    return result;
 };
 
 // --- REGLAS DE CONVERSIÓN ---
@@ -176,7 +180,6 @@ export const getConversionRules = async (onlyActive = true) => {
     return Array.isArray(data) ? data : [];
 };
 
-// ✅ ESTA ES LA FUNCIÓN QUE FALTABA
 export const createConversionRule = async (data: Partial<ConversionRule>) => {
     const response = await fetch(`${API_URL}/admin/conversion-rules`, { 
         method: 'POST', 
@@ -228,9 +231,41 @@ export const createPack = async (data: any) => {
 };
 
 export const updatePack = async (id: number, data: any) => {
-    const response = await fetch(`${API_URL}/admin/packs/${id}`, { method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data) });
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = { 
+        'Accept': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+    };
+
+    let method = 'PUT';
+    let body;
+
+    if (data instanceof FormData) {
+        method = 'POST'; 
+        body = data;
+        if (!body.has('_method')) {
+            body.append('_method', 'PUT');
+        }
+    } else {
+        method = 'PUT';
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(data);
+    }
+
+    const response = await fetch(`${API_URL}/admin/packs/${id}`, { 
+        method: method, 
+        headers: headers, 
+        body: body 
+    });
+
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || result.message || 'Error actualizar pack');
+    
+    if (!response.ok) {
+        const errorMsg = result.errors 
+            ? Object.values(result.errors).flat().join('\n') 
+            : (result.error || result.message || 'Error actualizar pack');
+        throw new Error(errorMsg);
+    }
     return result;
 };
 
@@ -304,7 +339,6 @@ export const createQuickProduct = async (name: string, price: number) => {
     });
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const updateProduct = async (id: number, data: any) => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
@@ -346,7 +380,7 @@ export const updateProduct = async (id: number, data: any) => {
 
     return await response.json();
 };
-//  (Para eliminar)
+
 export const deleteProduct = async (id: number) => {
     const response = await fetch(`${API_URL}/products/${id}`, { 
         method: 'DELETE', 
@@ -359,8 +393,8 @@ export const deleteProduct = async (id: number) => {
     }
     return await response.json();
 };
+
 export const deletePack = async (id: number) => {
-    // Usamos la ruta /admin/packs/{id} asumiendo que sigue el estándar REST de tu backend
     const response = await fetch(`${API_URL}/admin/packs/${id}`, { 
         method: 'DELETE', 
         headers: getAuthHeaders() 
@@ -370,5 +404,5 @@ export const deletePack = async (id: number) => {
         const result = await response.json().catch(() => ({}));
         throw new Error(result.error || result.message || 'Error al eliminar pack');
     }
-    return await response.json(); // O simplemente return true si tu API no devuelve JSON al borrar
+    return await response.json();
 };
