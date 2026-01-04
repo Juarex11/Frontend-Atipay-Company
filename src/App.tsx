@@ -18,6 +18,7 @@ import AdminDashboard from "./pages/admin/Dashboard/AdminDashboard";
 import { StoreManagement } from "@/pages/admin/StoreManagement";
 import { GiftsManagement } from "@/pages/admin/GiftsManagement";
 import ActiveInvestmentsPage from './pages/admin/ActiveInvestmentsPage';
+import RankRewardsManager from "./pages/admin/Dashboard/RankRewardsManager";
 
 
 import UserAffiliates from "@/pages/usuario/UserAffiliates";
@@ -37,6 +38,7 @@ import SalesRanking from "./pages/SalesRanking";
 import AdminSalesRanking from "./pages/admin/AdminSalesRanking";
 import NotFound from "./pages/NotFound";
 import { ManualPurchasePage } from "./pages/admin/ManualPurchasePage";
+
 
 const queryClient = new QueryClient();
 
@@ -266,6 +268,16 @@ function AppRoutes() {
           <AdminRoute>
             <AppLayout>
               <GiftsManagement />
+            </AppLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/rewards-settings"
+        element={
+          <AdminRoute>
+            <AppLayout>
+              <RankRewardsManager />
             </AppLayout>
           </AdminRoute>
         }

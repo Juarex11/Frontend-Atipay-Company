@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-// Línea 10 aprox:
 import {
   Eye,
   EyeOff,
@@ -33,6 +32,9 @@ import AnnualPerformanceChart from "@/components/dashboard/AnnualPerformanceChar
 import InvestmentGainsCharts from "@/components/investments/InvestmentGainsCharts";
 import { getMinPointsRequired } from "../../services/commissionService";
 import { RechargeDialog } from "@/components/wallet/RechargeDialog";
+
+// 1. IMPORTAMOS EL MODAL DE CONFETI (Asegúrate que la ruta sea correcta)
+import { AchievementModal, Achievement } from "@/components/common/AchievementModal";
 
 interface Transfer {
   id: number;
@@ -79,6 +81,11 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
+  // 2. ESTADOS PARA EL PREMIO
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
+  const [achievementKey, setAchievementKey] = useState<string>("");
+
   interface Investment extends Omit<ServiceInvestment, "promotion"> {
     promotion?: {
       name: string;
@@ -94,19 +101,17 @@ export default function Dashboard() {
     recentTransactions: [],
     investments: [],
   });
-  const [targetPoints, setTargetPoints] = useState(0); // Nuev
-  // // === NUEVO: Estados para el filtro de años ===
+  const [targetPoints, setTargetPoints] = useState(0); 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [chartHistory, setChartHistory] = useState<
     Array<{ name: string; points: number; qualified: boolean }>
   >([]);
 
-  // === NUEVO: Función para traer el historial específico por año ===
+  // Función para traer el historial específico por año
   useEffect(() => {
     const fetchHistoryByYear = async () => {
       try {
         const token = localStorage.getItem("token");
-        // Ajusta la URL si tu ruta en api.php es diferente (ej: /affiliate/history)
         const response = await fetch(
           `${API_BASE_URL}/affiliate/history?year=${selectedYear}`,
           {
@@ -119,8 +124,6 @@ export default function Dashboard() {
 
         if (response.ok) {
           const data = await response.json();
-          // Si tu backend devuelve { history: [...], ... } usa data.history
-          // Si devuelve directo el array, usa data
           setChartHistory(data.history || data);
         }
       } catch (error) {
@@ -129,10 +132,9 @@ export default function Dashboard() {
     };
 
     fetchHistoryByYear();
-  }, [selectedYear]); // Se ejecuta cada vez que cambias el año
-  // o estado para la meta
+  }, [selectedYear]);
 
-  // Nuevo useEffect para cargar la meta dinámica
+  // Cargar meta dinámica
   useEffect(() => {
     const loadGoal = async () => {
       const points = await getMinPointsRequired();
@@ -140,6 +142,63 @@ export default function Dashboard() {
     };
     loadGoal();
   }, []);
+
+  // 3. EFECTO PARA VERIFICAR SI HAY PREMIO (CONFETI)
+  useEffect(() => {
+    const checkAchievements = async () => {
+      if (!user) return; // Si no hay usuario, no hacemos nada
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/achievements/check`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.has_achievement) {
+            const data = result.data;
+            setCurrentAchievement({
+              id: Date.now(),
+              title: data.title,
+              rewardName: data.rewardName,
+              message: data.message,
+              imageUrl: data.imageUrl,
+            });
+            setAchievementKey(data.key);
+            setShowCelebration(true);
+          }
+        }
+      } catch (error) {
+        console.error("Error verificando premios:", error);
+      }
+    };
+
+    checkAchievements();
+  }, [user]);
+
+  // Función para cerrar modal y marcar visto
+  const handleCloseCelebration = async () => {
+    setShowCelebration(false);
+    if (achievementKey) {
+      try {
+        const token = localStorage.getItem("token");
+        await fetch(`${API_BASE_URL}/achievements/seen`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ key: achievementKey }),
+        });
+      } catch (error) {
+        console.error("Error marcando logro como visto", error);
+      }
+    }
+  };
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -250,7 +309,6 @@ export default function Dashboard() {
     }
   }, [user, navigate, fetchDashboardData]);
 
-  // Obtener perfil del usuario para mostrar el nombre correcto
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -290,15 +348,13 @@ export default function Dashboard() {
     );
   };
 
-  // 1. Convertimos la data vieja (puntos) al formato nuevo (points)
   const initialData = (dashboardData.points_history || []).map((item) => ({
     name: item.name,
-    points: item.puntos, // <--- AQUÍ CAMBIAMOS EL NOMBRE
+    points: item.puntos,
     qualified: false,
     month: 0,
   }));
 
-  // 2. Decidimos qué mostrar: ¿Lo que trajo el filtro o lo inicial?
   const chartDataToDisplay =
     chartHistory.length > 0 ? chartHistory : initialData;
 
@@ -383,15 +439,13 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* ===> MODIFICAR ESTA TARJETA (Saldo Disponible) <=== */}
             <Card
-              onClick={() => setShowRechargeModal(true)} // 1. Al hacer clic, abre el modal
-              className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white border-0 cursor-pointer transition-transform hover:scale-[1.02] shadow-lg hover:shadow-emerald-900/20" // 2. Estilos para indicar que es clickeable
+              onClick={() => setShowRechargeModal(true)}
+              className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white border-0 cursor-pointer transition-transform hover:scale-[1.02] shadow-lg hover:shadow-emerald-900/20"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/90">
                   Saldo Disponible
-                  {/* Opcional: Agregar un icono pequeño de 'plus' o texto 'Recargar' aquí */}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   <AtipayCoin size="sm" className="text-white" />
@@ -426,7 +480,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Ganancias Totales Card */}
             <Card className="bg-gradient-to-br from-[#0c4a2a] to-[#0a7e3e] text-white border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/90">
@@ -448,7 +501,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Puntos Acumulados Card */}
             <Card className="bg-gradient-to-br from-teal-700 to-teal-900 text-white border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/90">
@@ -471,7 +523,6 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Inversiones Activas Card */}
             <Card className="bg-gradient-to-br from-lime-700 to-lime-900 text-white border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/90">
@@ -494,7 +545,7 @@ export default function Dashboard() {
             </Card>
           </div>
         )}
-        {/* ================= SECCIÓN PRO: RENDIMIENTO INTEGRAL ================= */}
+        
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-800">
@@ -510,7 +561,6 @@ export default function Dashboard() {
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
-              {/* COLUMNA IZQUIERDA: ESTADO Y METAS (40% ancho) */}
               <div className="lg:col-span-5 p-6 flex flex-col justify-center bg-gray-50/50">
                 <div className="flex items-center gap-2 mb-6">
                   <div className="p-2 bg-green-100 text-green-700 rounded-lg">
@@ -536,7 +586,6 @@ export default function Dashboard() {
                     </span>
                   </div>
 
-                  {/* Mensaje dinámico */}
                   {dashboardData.points < targetPoints ? (
                     <p className="text-sm text-amber-600 font-medium mt-1 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
@@ -552,7 +601,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Barra de Progreso */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
                     <span>Progreso</span>
@@ -583,7 +631,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Badge Final */}
                 <div className="mt-6">
                   {dashboardData.points >= targetPoints ? (
                     <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-lg text-green-800">
@@ -609,7 +656,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* COLUMNA DERECHA: GRÁFICO (60% ancho) */}
               <div className="lg:col-span-7 p-6 flex flex-col justify-center bg-white">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -621,12 +667,11 @@ export default function Dashboard() {
                   </span>
                 </div>
 
-                {/* CAMBIO AQUÍ: Aumentamos de 300px a 450px para darle más altura */}
                 <div className="w-full h-[450px]">
                   <AnnualPerformanceChart
-                    data={chartDataToDisplay} // <--- Usamos la data arreglada
-                    year={selectedYear} // <--- Usamos la variable que daba error "unused"
-                    onYearChange={setSelectedYear} // <--- Conectamos el selector
+                    data={chartDataToDisplay}
+                    year={selectedYear}
+                    onYearChange={setSelectedYear}
                   />
                 </div>
               </div>
@@ -634,13 +679,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* LÓGICA FINAL: Si invierte -> Gráficos. Si no -> Calificación */}
-        {/* ================================================================================== */}
-        {/* SECCIÓN INFERIOR: CÓMO CRECEN TUS INVERSIONES (Lógica recuperada)                  */}
-        {/* ================================================================================== */}
-
         <div className="mt-8">
-          {/* TÍTULO DE LA SECCIÓN */}
           <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-800">
               Cómo crecen tus inversiones
@@ -652,7 +691,6 @@ export default function Dashboard() {
           </div>
 
           {dashboardData.investments.length > 0 ? (
-            // OPCIÓN A: SI TIENE INVERSIONES -> MUESTRA EL GRÁFICO REAL
             <Card>
               <CardContent className="pt-6">
                 <InvestmentGainsCharts
@@ -661,9 +699,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ) : (
-            // OPCIÓN B: NO TIENE INVERSIONES -> MUESTRA EL DISEÑO DE "ESTADO VACÍO" (FOTO 2)
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Tarjeta 1: Ganancias Diarias Vacía */}
               <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center h-64 justify-center">
                 <div className="w-full text-left mb-auto">
                   <h3 className="text-lg font-bold text-orange-500">
@@ -687,7 +723,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Tarjeta 2: Ganancias Mensuales Vacía */}
               <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm flex flex-col items-center text-center h-64 justify-center">
                 <div className="w-full text-left mb-auto">
                   <h3 className="text-lg font-bold text-orange-500">
@@ -718,11 +753,17 @@ export default function Dashboard() {
         open={showRechargeModal}
         onOpenChange={setShowRechargeModal}
         onRechargeSuccess={() => {
-          fetchDashboardData(); // Recarga el saldo en pantalla si la recarga es exitosa
-          // Opcional: mostrar un toast de éxito extra aquí si quieres
+          fetchDashboardData();
         }}
       />
-      {/* Este cierra el div className="p-6 space-y-6" */}
+      
+      {/* 4. AQUI PONEMOS EL MODAL AL FINAL DEL ARCHIVO */}
+      <AchievementModal
+        isOpen={showCelebration}
+        onClose={handleCloseCelebration}
+        achievement={currentAchievement}
+      />
+
     </AppLayout>
   );
 }

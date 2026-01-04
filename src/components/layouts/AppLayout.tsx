@@ -112,6 +112,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
     { icon: Package, label: "Tienda Admin", href: "/admin/store" },
     { icon: BarChart3, label: "Reporte de Comisiones", href: "/admin/reports/commissions" },
     { icon: TrendingUp, label: "Configurar Comisiones", href: "/admin/commissions" },
+    { icon: Trophy, label: "Configurar Premios", href: "/admin/rewards-settings" }, 
     { icon: Settings, label: "Perfil de Admin", href: "/admin/profile" }
   ];
 
