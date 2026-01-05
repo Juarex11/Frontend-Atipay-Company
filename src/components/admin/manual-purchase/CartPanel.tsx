@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, ChevronDown, ShoppingBag, X, Award, Info, Banknote, Wallet, ArrowRight, Send, ExternalLink } from 'lucide-react';
+import { Users, ChevronDown, ShoppingBag, X, Award, Info, Banknote, Wallet, ArrowRight, Send } from 'lucide-react';
 import type { User, CartItem } from './types';
 
 interface CartPanelProps {
@@ -41,14 +41,6 @@ export const CartPanel: React.FC<CartPanelProps> = ({
     const selectedUserData = users.find(u => u.id.toString() === selectedUser);
     const userBalance = selectedUserData?.atipay_money || 0;
     const hasEnoughBalance = !selectedUserData || paymentMethod === 'cash' || userBalance >= totalMoney;
-
-    // Lógica nueva para ir a la tienda
-    const handleOpenStore = () => {
-        if (selectedUser) {
-            // Abre la tienda en una pestaña nueva filtrando por el cliente
-            window.open(`/tienda?client_id=${selectedUser}`, '_blank');
-        }
-    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -96,16 +88,6 @@ export const CartPanel: React.FC<CartPanelProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* 🔥 BOTÓN NUEVO: VER TIENDA DEL USUARIO */}
-                {selectedUser && (
-                    <button 
-                        onClick={handleOpenStore}
-                        className="mt-3 w-full py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5"/> Ver Tienda del Usuario
-                    </button>
-                )}
             </div>
 
             {/* CARRITO Y PAGO */}
