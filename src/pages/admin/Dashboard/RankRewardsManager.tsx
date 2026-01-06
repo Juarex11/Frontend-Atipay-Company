@@ -9,13 +9,13 @@ import {
   Trophy, Save, BarChart3, Settings, 
   Search, RefreshCw, ArrowLeft, ArrowRight,
   Play, Pause, TrendingUp, Users, Wallet, Filter,
-  ClipboardList // ✅ Importamos icono para el reporte
+  ClipboardList // ✅ Icono para el reporte
 } from 'lucide-react';
 import { API_BASE_URL } from '@/config';
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-// ✅ IMPORTAMOS EL MODAL QUE CORREGIMOS
+// ✅ IMPORTAMOS EL MODAL DE REPORTE
 import { LevelReportModal } from '@/components/admin/LevelReportModal';
 
 // --- TIPOS DE DATOS ---
@@ -47,6 +47,7 @@ interface PaginationData {
 
 const FilterButton = ({ 
   label, 
+  value, // eslint-disable-line @typescript-eslint/no-unused-vars
   isActive, 
   colorClass, 
   onClick 
@@ -139,7 +140,7 @@ export default function RankRewardsManager() {
     }
   }, [token, page, searchTerm, filterLevel]); 
 
-  // ✅ FUNCIÓN PARA CARGAR REPORTE DE NIVELES (PEDIDO DE CHRISTOPHER)
+  // ✅ FUNCIÓN PARA CARGAR REPORTE DE NIVELES
   const handleOpenLevelReport = async (userId: number, username: string) => {
     try {
       // Endpoint que calcula el progreso por nivel
@@ -268,16 +269,85 @@ export default function RankRewardsManager() {
                 </div>
                 <div className="flex-1 w-full">
                   {editingId === lvl.id ? (
-                    <div className="bg-gray-50 p-4 rounded-xl space-y-3 border border-gray-200">
-                      <div className="grid grid-cols-2 gap-3">
-                        <Input type="number" value={formData.min_points} onChange={e => setFormData({...formData, min_points: e.target.value})} placeholder="Puntos" className="bg-white" />
-                        <Input value={formData.reward_text} onChange={e => setFormData({...formData, reward_text: e.target.value})} placeholder="Nombre Premio" className="bg-white" />
+                    // --- ✅ SECCIÓN DE EDICIÓN MEJORADA CON LABELS ---
+                    <div className="bg-gray-50 p-5 rounded-2xl space-y-4 border border-gray-200 shadow-inner">
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* CAMPO: PUNTOS MÍNIMOS */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
+                            Puntos Mínimos
+                          </label>
+                          <Input 
+                            type="number" 
+                            value={formData.min_points} 
+                            onChange={e => setFormData({...formData, min_points: e.target.value})} 
+                            placeholder="Ej: 1000" 
+                            className="bg-white border-gray-200 focus:border-emerald-500 transition-colors" 
+                          />
+                        </div>
+
+                        {/* CAMPO: TÍTULO DEL PREMIO */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
+                            Título del Premio
+                          </label>
+                          <Input 
+                            value={formData.reward_text} 
+                            onChange={e => setFormData({...formData, reward_text: e.target.value})} 
+                            placeholder="Ej: Bono de Inicio Rápido" 
+                            className="bg-white border-gray-200 focus:border-emerald-500 transition-colors" 
+                          />
+                        </div>
                       </div>
-                      <Textarea value={formData.reward_message} onChange={e => setFormData({...formData, reward_message: e.target.value})} placeholder="Mensaje" className="bg-white" />
-                      <Input type="file" onChange={e => setImageFile(e.target.files?.[0] || null)} className="bg-white" />
+
+                      {/* CAMPO: MENSAJE / DESCRIPCIÓN */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
+                          Mensaje Motivacional
+                        </label>
+                        <Textarea 
+                          value={formData.reward_message} 
+                          onChange={e => setFormData({...formData, reward_message: e.target.value})} 
+                          placeholder="Ej: ¡Felicidades! Has desbloqueado el primer nivel..." 
+                          className="bg-white border-gray-200 focus:border-emerald-500 transition-colors min-h-[80px]" 
+                        />
+                      </div>
+
+                      {/* CAMPO: IMAGEN DEL PREMIO */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">
+                          Imagen del Premio
+                        </label>
+                        <div className="relative">
+                          <Input 
+                            type="file" 
+                            onChange={e => setImageFile(e.target.files?.[0] || null)} 
+                            className="bg-white border-gray-200 file:bg-emerald-50 file:text-emerald-700 file:border-0 file:rounded-lg file:text-xs file:font-bold file:mr-4 hover:file:bg-emerald-100 transition-all" 
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic ml-1">
+                          Formato recomendado: PNG o JPG (Max 2MB)
+                        </p>
+                      </div>
+
                       <div className="flex justify-end gap-2 pt-2">
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancelar</Button>
-                        <Button size="sm" onClick={() => handleSaveConfig(lvl.id)} disabled={loadingSave} className="bg-emerald-600"><Save className="w-4 h-4 mr-2" /> Guardar</Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => setEditingId(null)}
+                          className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleSaveConfig(lvl.id)} 
+                          disabled={loadingSave} 
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                        >
+                          <Save className="w-4 h-4 mr-2" /> Guardar Cambios
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -296,7 +366,7 @@ export default function RankRewardsManager() {
         </div>
       )}
 
-      {/* VISTA 2: MONITORIZACIÓN */}
+      {/* VISTA 2: MONITORIZACIÓN (Sin cambios mayores, solo integración) */}
       {activeTab === 'monitor' && (
         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
           {/* KPIs */}
@@ -356,7 +426,7 @@ export default function RankRewardsManager() {
                       <th className="px-6 py-4">Puntos Acumulados</th>
                       <th className="px-6 py-4">Nivel Estimado</th>
                       <th className="px-6 py-4">Saldo Disponible</th>
-                      {/* ✅ NUEVA COLUMNA DE ACCIONES */}
+                      {/* ✅ COLUMNA DE ACCIONES */}
                       <th className="px-6 py-4 text-center">Acciones</th>
                     </tr>
                   </thead>
@@ -430,7 +500,7 @@ export default function RankRewardsManager() {
         </div>
       )}
 
-      {/* ✅ RENDERIZAMOS EL MODAL DE REPORTE (CON DESCRIPCIÓN PARA ACCESIBILIDAD) */}
+      {/* MODAL DE REPORTE (Con estilo Premium que diseñamos) */}
       <LevelReportModal 
         isOpen={levelReport.isOpen}
         onClose={() => setLevelReport({ ...levelReport, isOpen: false })}
