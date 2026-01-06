@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Loader2, TrendingUp, Calendar } from 'lucide-react';
+// Quitamos los imports de tipos de recharts que daban problemas o no se usaban
+import { Loader2, TrendingUp, Calendar, ChevronDown } from 'lucide-react';
 import { API_BASE_URL } from '@/config'; 
 
-// Definimos la estructura de los datos que vienen del backend
+// 1. Interfaz para los datos del gráfico
 interface ChartData {
   name: string;
   points: number;
@@ -17,14 +18,14 @@ interface AffiliateStatsModalProps {
   userName: string;
 }
 
-// Definimos nuestras propias props para el Tooltip para evitar conflictos de tipos
+// 2. Interfaz manual simple para el Tooltip (Sin depender de Recharts)
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ value: number }>;
   label?: string;
 }
 
-// Componente para el mensaje flotante al pasar el mouse
+// Componente visual del Tooltip
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length > 0) {
     return (
@@ -47,10 +48,12 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
 }) => {
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [year, setYear] = useState(new Date().getFullYear());
+  
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const availableYears = [currentYear - 1, currentYear, currentYear + 1];
 
   useEffect(() => {
-    // Definimos la función dentro del useEffect para cumplir con las reglas de React
     const fetchHistory = async () => {
       if (!userId) return;
       
@@ -58,15 +61,13 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
         setLoading(true);
         const token = localStorage.getItem('token');
         
-        const response = await fetch(`${API_BASE_URL}/affiliate/${userId}/stats`, {
+        const response = await fetch(`${API_BASE_URL}/affiliate/${userId}/stats?year=${selectedYear}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
           const result = await response.json();
-          // "Casteamos" la respuesta para decirle a TS que confíe en que es ChartData[]
           setData(result.history as ChartData[]); 
-          setYear(result.year);
         }
       } catch (error) {
         console.error("Error cargando estadísticas", error);
@@ -78,7 +79,7 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
     if (isOpen && userId) {
       fetchHistory();
     }
-  }, [isOpen, userId]); 
+  }, [isOpen, userId, selectedYear]); 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -96,10 +97,21 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
                 Puntos acumulados mes a mes
               </p>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-200">
-                <Calendar className="w-4 h-4 text-gray-500"/>
-                <span className="text-sm font-semibold text-gray-700">{year}</span>
+
+            <div className="relative">
+              <Calendar className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none"/>
+              <select 
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="pl-9 pr-8 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm font-semibold text-gray-700 appearance-none focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
             </div>
+
           </div>
         </DialogHeader>
 
@@ -107,7 +119,7 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
           {loading ? (
             <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-10 h-10 animate-spin text-green-500" />
-                <span className="text-sm text-gray-400 font-medium">Cargando datos...</span>
+                <span className="text-sm text-gray-400 font-medium">Cargando datos del {selectedYear}...</span>
             </div>
           ) : (
             <div className="w-full h-[350px]">
@@ -127,7 +139,8 @@ export const AffiliateStatsModal: React.FC<AffiliateStatsModalProps> = ({
                     tickLine={false}
                   />
                   
-                  {/* TRUCO: Usamos 'as unknown' para pasar los props de Recharts a nuestro componente sin que TS se queje */}
+                  {/* 3. SOLUCIÓN FINAL: Usamos 'as unknown as CustomTooltipProps'
+                      Esto evita el error de tipos de Recharts y cumple con ESLint (sin usar 'any') */}
                   <Tooltip 
                     cursor={{ fill: '#F9FAFB' }}
                     content={(props) => {
