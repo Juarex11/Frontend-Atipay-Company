@@ -151,6 +151,7 @@ export default function RankRewardsManager() {
         const data = await res.json();
         setLevelReport({ isOpen: true, data, username });
       }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       toast.error("No se pudo cargar el reporte de niveles");
     }
