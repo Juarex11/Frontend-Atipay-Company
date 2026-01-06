@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +40,31 @@ interface PaginationData {
   prev_page_url: string | null;
 }
 
+// --- COMPONENTE BOTÓN DE FILTRO (EXTERNO) ---
+const FilterButton = ({ 
+  label, 
+  isActive, 
+  colorClass, 
+  onClick 
+}: { 
+  label: string, 
+  value: string, 
+  isActive: boolean, 
+  colorClass: string, 
+  onClick: () => void 
+}) => (
+  <button
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${
+      isActive 
+        ? `${colorClass} ring-2 ring-offset-1 ring-gray-100 shadow-sm` 
+        : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 export default function RankRewardsManager() {
   const [activeTab, setActiveTab] = useState<'config' | 'monitor'>('config');
   const [isLive, setIsLive] = useState(true);
@@ -54,6 +79,7 @@ export default function RankRewardsManager() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loadingSave, setLoadingSave] = useState(false);
 
+  // Usamos useCallback para que no cambie en cada render
   const fetchLevels = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/level-rewards`, {
@@ -69,15 +95,19 @@ export default function RankRewardsManager() {
   const [users, setUsers] = useState<UserRank[]>([]);
   const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterLevel, setFilterLevel] = useState<string>('all'); // NUEVO: Estado del filtro
+  const [filterLevel, setFilterLevel] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  
+  // SOLUCIÓN AL BUCLE: Usamos useRef para saber si ya cargamos datos alguna vez
+  const hasLoadedRef = useRef(false);
 
   const fetchHistory = useCallback(async () => {
-    if (!pagination && searchTerm === '') setLoadingHistory(true); 
+    // Solo mostramos spinner si es la primera vez que cargamos o si NO estamos en vivo
+    // Esto evita el parpadeo en el polling
+    if (!hasLoadedRef.current) setLoadingHistory(true);
     
     try {
-      // Enviamos el filtro de nivel al backend
       const url = `${API_BASE_URL}/admin/rank-history?page=${page}&search=${searchTerm}&level=${filterLevel}`;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -93,13 +123,24 @@ export default function RankRewardsManager() {
           next_page_url: data.next_page_url,
           prev_page_url: data.prev_page_url
         });
+        hasLoadedRef.current = true; // Marcamos que ya tenemos datos
       }
     } catch (err) { 
       console.error("Error historial:", err);
     } finally {
       setLoadingHistory(false);
     }
-  }, [token, page, searchTerm, pagination, filterLevel]); // Agregamos filterLevel a dependencias
+    // ¡OJO! Quitamos 'pagination' y 'isLive' de las dependencias para evitar el bucle infinito
+  }, [token, page, searchTerm, filterLevel]); 
+
+  // Handler para cambiar filtros
+  const handleFilterChange = (level: string) => {
+    if (filterLevel === level) return; // Si es el mismo, no hacemos nada
+    setFilterLevel(level);
+    setPage(1);
+    hasLoadedRef.current = false; // Reseteamos para mostrar loading visual
+    setUsers([]); // Limpiamos tabla visualmente
+  };
 
   // Estadísticas (KPIs)
   const stats = useMemo(() => {
@@ -120,14 +161,20 @@ export default function RankRewardsManager() {
     if (activeTab === 'config') fetchLevels();
     
     if (activeTab === 'monitor') {
-      fetchHistory(); 
+      fetchHistory(); // Carga inicial
+      
       let intervalId: NodeJS.Timeout;
+      // Solo activamos polling si está En Vivo y no hay búsqueda activa
       if (isLive && searchTerm === '') {
-        intervalId = setInterval(fetchHistory, 10000); 
+        intervalId = setInterval(() => {
+            // Llamamos a la función directamente
+            fetchHistory();
+        }, 10000); 
       }
       return () => { if (intervalId) clearInterval(intervalId); };
     }
-  }, [activeTab, isLive, searchTerm, fetchLevels, fetchHistory, filterLevel]);
+  }, [activeTab, isLive, searchTerm, fetchLevels, fetchHistory]); 
+  // Al sacar 'pagination' de fetchHistory, fetchHistory ya es estable y este useEffect no se vuelve loco.
 
   // Handlers Config
   const startEditing = (lvl: LevelReward) => {
@@ -160,20 +207,6 @@ export default function RankRewardsManager() {
     } catch { toast.error("Error al guardar"); }
     finally { setLoadingSave(false); }
   };
-
-  // Helper para botones de filtro
-  const FilterButton = ({ label, value, colorClass }: { label: string, value: string, colorClass: string }) => (
-    <button
-      onClick={() => { setFilterLevel(value); setPage(1); }}
-      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
-        filterLevel === value 
-          ? `${colorClass} ring-2 ring-offset-1 ring-gray-100 shadow-sm` 
-          : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-      }`}
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -292,15 +325,15 @@ export default function RankRewardsManager() {
               </div>
 
               {/* Botones de Filtro por Nivel */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                 <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <FilterButton label="Todos" value="all" colorClass="bg-gray-800 text-white" />
-                <FilterButton label="Sin Rango" value="0" colorClass="bg-gray-200 text-gray-700" />
-                <FilterButton label="Nivel 1" value="1" colorClass="bg-emerald-100 text-emerald-700" />
-                <FilterButton label="Nivel 2" value="2" colorClass="bg-emerald-200 text-emerald-800" />
-                <FilterButton label="Nivel 3" value="3" colorClass="bg-emerald-300 text-emerald-900" />
-                <FilterButton label="Nivel 4" value="4" colorClass="bg-emerald-400 text-emerald-950" />
-                <FilterButton label="Nivel 5+" value="5" colorClass="bg-emerald-500 text-white" />
+                <FilterButton label="Todos" value="all" isActive={filterLevel === 'all'} colorClass="bg-gray-800 text-white" onClick={() => handleFilterChange('all')} />
+                <FilterButton label="Sin Rango" value="0" isActive={filterLevel === '0'} colorClass="bg-gray-200 text-gray-700" onClick={() => handleFilterChange('0')} />
+                <FilterButton label="Nivel 1" value="1" isActive={filterLevel === '1'} colorClass="bg-emerald-100 text-emerald-700" onClick={() => handleFilterChange('1')} />
+                <FilterButton label="Nivel 2" value="2" isActive={filterLevel === '2'} colorClass="bg-emerald-200 text-emerald-800" onClick={() => handleFilterChange('2')} />
+                <FilterButton label="Nivel 3" value="3" isActive={filterLevel === '3'} colorClass="bg-emerald-300 text-emerald-900" onClick={() => handleFilterChange('3')} />
+                <FilterButton label="Nivel 4" value="4" isActive={filterLevel === '4'} colorClass="bg-emerald-400 text-emerald-950" onClick={() => handleFilterChange('4')} />
+                <FilterButton label="Nivel 5+" value="5" isActive={filterLevel === '5'} colorClass="bg-emerald-500 text-white" onClick={() => handleFilterChange('5')} />
               </div>
             </div>
 
@@ -316,8 +349,8 @@ export default function RankRewardsManager() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {loadingHistory && !users.length ? (
-                      <tr><td colSpan={4} className="p-12 text-center text-gray-400"><RefreshCw className="animate-spin w-8 h-8 mx-auto mb-2 opacity-50" /> Cargando...</td></tr>
+                    {loadingHistory ? (
+                      <tr><td colSpan={4} className="p-12 text-center text-gray-400"><RefreshCw className="animate-spin w-8 h-8 mx-auto mb-2 opacity-50" /> Cargando datos...</td></tr>
                     ) : users.length === 0 ? (
                       <tr><td colSpan={4} className="p-12 text-center text-gray-400">No hay usuarios en este nivel</td></tr>
                     ) : (

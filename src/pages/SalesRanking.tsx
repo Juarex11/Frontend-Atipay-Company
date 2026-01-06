@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getSalesRanking, getMyAffiliates } from '../services/rankingService';
+import { getMyAffiliates } from '../services/rankingService';
 import type { RankingUser, CurrentUserRanking, RankingTableProps } from '../types/ranking';
 import { toast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AtipayCoin } from '@/components/ui/AtipayCoin';
+import { Star, BarChart3 } from 'lucide-react'; // Agregamos el icono del gráfico
+import { AffiliateStatsModal } from '@/components/affiliates/AffiliateStatsModal'; // Importamos el modal
 
 const SalesRanking: React.FC = () => {
   const [ranking, setRanking] = useState<RankingUser[]>([]);
@@ -17,6 +18,9 @@ const SalesRanking: React.FC = () => {
   const [affiliatesRanking, setAffiliatesRanking] = useState<RankingUser[]>([]);
   const [affiliatesLoading, setAffiliatesLoading] = useState(false);
   const [affiliatesError, setAffiliatesError] = useState('');
+
+  // Estado para controlar qué usuario se muestra en el gráfico
+  const [statsUser, setStatsUser] = useState<{id: number, name: string} | null>(null);
 
   useEffect(() => {
     fetchRanking();
@@ -34,24 +38,18 @@ const SalesRanking: React.FC = () => {
       setLoading(true);
       setError('');
       
-      // 1. Definir la URL según la pestaña
-      // Asumo que tu API corre en localhost:8000 o tienes una variable de entorno.
-      // Ajusta la base URL si es necesario.
       const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
       const endpoint = activeTab === 'general' 
         ? `${baseUrl}/affiliate/ranking`
         : `${baseUrl}/ranking/my-affiliates`;
 
-      // 2. Obtener el token (AJUSTA LA CLAVE SI LA GUARDAS CON OTRO NOMBRE)
-      // Normalmente se guarda como 'token', 'auth_token' o 'access_token' en localStorage
       const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
 
-      // 3. Petición usando FETCH
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Importante para que Laravel sepa quién eres
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -61,33 +59,24 @@ const SalesRanking: React.FC = () => {
 
       const data = await response.json();
 
-      // 4. Manejo de la respuesta (Array directo vs Objeto envuelto)
       if (Array.isArray(data)) {
          setRanking(data);
          setCurrentUserRanking(null); 
       } else {
-         // Si el backend antiguo devolvía un objeto con 'ranking' dentro
          setRanking(data.ranking || data);
          setCurrentUserRanking(data.current_user_ranking || null);
       }
 
-    } catch (err: unknown) { // <--- CORRECCIÓN DEL ERROR DE TYPE 'ANY'
+    } catch (err: unknown) {
       console.error(err);
-      
-      // Lógica segura para extraer el mensaje de error en TypeScript
       let message = 'Error al cargar el ranking';
       if (err instanceof Error) {
         message = err.message;
       } else if (typeof err === 'object' && err !== null && 'message' in err) {
          message = String((err as { message: unknown }).message);
       }
-
       setError(message);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: message,
-      });
+      toast({ variant: 'destructive', title: 'Error', description: message });
     } finally {
       setLoading(false);
     }
@@ -97,21 +86,21 @@ const SalesRanking: React.FC = () => {
     try {
       setAffiliatesLoading(true);
       setAffiliatesError('');
-
       const data = await getMyAffiliates();
       setAffiliatesRanking(data);
     } catch (err: unknown) {
       const error = err as { errorData?: { message?: string } };
       const message = error.errorData?.message || 'Error al cargar los afiliados';
       setAffiliatesError(message);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: message,
-      });
+      toast({ variant: 'destructive', title: 'Error', description: message });
     } finally {
       setAffiliatesLoading(false);
     }
+  };
+
+  // Función para abrir el modal
+  const handleShowStats = (userId: number, userName: string) => {
+    setStatsUser({ id: userId, name: userName });
   };
 
   return (
@@ -133,7 +122,6 @@ const SalesRanking: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* CONTENIDO DE TABS */}
         <TabsContent value="general">
           <RankingTable
             ranking={ranking}
@@ -144,34 +132,43 @@ const SalesRanking: React.FC = () => {
             description="Ranking global del sistema"
             limit={10}
             showLevel={false}
+            // En el ranking general también permitimos ver el gráfico
+            onShowStats={handleShowStats}
           />
         </TabsContent>
 
         <TabsContent value="affiliates">
           <RankingTable
-            ranking={ranking}
+            ranking={affiliatesRanking}
             currentUserRanking={null}
             loading={affiliatesLoading}
             error={affiliatesError}
-            loading={loading}
-            error={error}
             title="Ranking de Mis Afiliados"
             description="Tus afiliados directos y su rendimiento"
             limit={null}
             showLevel={true}
+            onShowStats={handleShowStats} // Pasamos la función al componente
           />
         </TabsContent>
       </Tabs>
+
+      {/* Renderizamos el Modal al final */}
+      <AffiliateStatsModal 
+        isOpen={!!statsUser} 
+        onClose={() => setStatsUser(null)} 
+        userId={statsUser?.id || null} 
+        userName={statsUser?.name || ''} 
+      />
     </div>
   );
 };
 
-// ... COMPONENTE RankingTable ...
-// (MANTÉN EL COMPONENTE RankingTable QUE YA TIENES ABAJO EN TU ARCHIVO,
-// NO HACE FALTA CAMBIARLO, SOLO COPIA LA PARTE SUPERIOR "SalesRanking")
+// Extendemos la interfaz original para incluir onShowStats
+interface ExtendedRankingTableProps extends RankingTableProps {
+  onShowStats: (id: number, name: string) => void;
+}
 
-// Para que no te de error al copiar, declaro aquí que RankingTable sigue igual:
-const RankingTable: React.FC<RankingTableProps> = ({
+const RankingTable: React.FC<ExtendedRankingTableProps> = ({
   ranking,
   currentUserRanking,
   loading,
@@ -179,10 +176,9 @@ const RankingTable: React.FC<RankingTableProps> = ({
   title,
   description,
   limit,
-  showLevel = false
+  showLevel = false,
+  onShowStats
 }) => {
-    // ... Copia aquí el contenido de tu componente RankingTable original ...
-    // ... O simplemente no borres esa parte de tu archivo ...
   const displayedRanking = limit ? ranking.slice(0, limit) : ranking;
 
   return (
@@ -204,21 +200,12 @@ const RankingTable: React.FC<RankingTableProps> = ({
       ) : error ? (
         <div className="p-6 text-center">
           <div className="text-red-500 bg-red-50 p-4 rounded-lg inline-flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
             {error}
           </div>
         </div>
       ) : displayedRanking.length === 0 ? (
         <div className="p-8 text-center">
-          <div className="inline-flex flex-col items-center justify-center p-6 rounded-xl bg-gray-50 max-w-md">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-700 mb-1">No hay datos disponibles</h3>
-            <p className="text-gray-500 text-sm">Aún no hay información para mostrar en este ranking</p>
-          </div>
+           <h3 className="text-lg font-medium text-gray-700 mb-1">No hay datos disponibles</h3>
         </div>
       ) : (
         <div className="rounded-md border overflow-hidden">
@@ -229,6 +216,8 @@ const RankingTable: React.FC<RankingTableProps> = ({
                 <TableHead className="text-white">USUARIO</TableHead>
                 {showLevel && <TableHead className="text-white text-center w-40">NIVEL</TableHead>}
                 <TableHead className="text-white w-40">PUNTOS</TableHead>
+                {/* Columna del botón */}
+                <TableHead className="text-white w-20 text-center">HISTORIAL</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -240,60 +229,52 @@ const RankingTable: React.FC<RankingTableProps> = ({
                   <TableRow key={user.id} className={isCurrentUser ? 'bg-green-50' : ''}>
                     <TableCell className="text-center w-32">
                       <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium ${
-                        position === 1 
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                          : position === 2
-                          ? 'bg-slate-50 text-slate-700 border border-slate-200'
-                          : position === 3
-                          ? 'bg-orange-50 text-orange-700 border border-orange-200'
-                          : 'bg-gray-50 text-gray-600 border border-gray-200'
-                      }`}>
-                        #{position}
-                      </span>
+                        position === 1 ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                        : position === 2 ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                        : position === 3 ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                        : 'bg-gray-50 text-gray-600 border border-gray-200'
+                      }`}>#{position}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-900">
                           {user.username}
-                          {isCurrentUser && (
-                            <span className="ml-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
-                              Tú
-                            </span>
-                          )}
+                          {isCurrentUser && <span className="ml-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Tú</span>}
                         </span>
                       </div>
                     </TableCell>
                     {showLevel && (
                         <TableCell className="w-32 text-center">
-                        <span className="inline-flex justify-center px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">
-                          Nivel {user.level}
-                        </span>
+                        <span className="inline-flex justify-center px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full">Nivel {user.level}</span>
                       </TableCell>
                     )}
                     {showLevel && !user.level && <TableCell className="w-24"></TableCell>}
                     <TableCell className="w-40">
                       <div className="flex items-center gap-1.5">
-                        <AtipayCoin size="xs" className="text-yellow-500" />
+                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         <span className="text-sm font-semibold text-gray-900">
                           {user.accumulated_points.toLocaleString('es-ES')}
                         </span>
                       </div>
                     </TableCell>
+                    {/* BOTÓN DEL GRÁFICO */}
+                    <TableCell className="text-center">
+                      <button 
+                        onClick={() => onShowStats(user.id, user.username)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-green-600"
+                        title="Ver historial mensual"
+                      >
+                        <BarChart3 className="w-5 h-5" />
+                      </button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
+              
               {limit && currentUserRanking && !displayedRanking.some(u => u.id === currentUserRanking.id) && (
                 <TableRow key={`current-user-${currentUserRanking.id}`} className="bg-green-50">
                   <TableCell className="text-center w-32">
-                    <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium ${
-                      currentUserRanking.position === 1
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : currentUserRanking.position === 2
-                        ? 'bg-slate-50 text-slate-700 border border-slate-200'
-                        : currentUserRanking.position === 3
-                        ? 'bg-orange-50 text-orange-700 border border-orange-200'
-                        : 'bg-gray-50 text-gray-600 border border-gray-200'
-                    }`}>
+                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
                       #{currentUserRanking.position}
                     </span>
                   </TableCell>
@@ -308,11 +289,19 @@ const RankingTable: React.FC<RankingTableProps> = ({
                   {showLevel && <TableCell className="w-32 text-center"></TableCell>}
                   <TableCell className="w-40">
                     <div className="flex items-center gap-1.5">
-                      <AtipayCoin size="xs" className="text-yellow-500" />
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                       <span className="text-sm font-semibold text-gray-900">
                         {currentUserRanking.accumulated_points.toLocaleString('es-ES')}
                       </span>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <button 
+                      onClick={() => onShowStats(currentUserRanking.id, currentUserRanking.username)}
+                      className="p-2 hover:bg-green-200 rounded-full transition-colors text-green-600"
+                    >
+                      <BarChart3 className="w-5 h-5" />
+                    </button>
                   </TableCell>
                 </TableRow>
               )}

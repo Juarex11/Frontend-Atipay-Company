@@ -3,7 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AppLayout from "@/components/layouts/AppLayout";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom"; // Corregido a react-router-dom
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
@@ -17,10 +23,8 @@ import Promotions from "./pages/Promotions";
 import AdminDashboard from "./pages/admin/Dashboard/AdminDashboard";
 import { StoreManagement } from "@/pages/admin/StoreManagement";
 import { GiftsManagement } from "@/pages/admin/GiftsManagement";
-import ActiveInvestmentsPage from './pages/admin/ActiveInvestmentsPage';
+import ActiveInvestmentsPage from "./pages/admin/ActiveInvestmentsPage";
 import RankRewardsManager from "./pages/admin/Dashboard/RankRewardsManager";
-
-
 import UserAffiliates from "@/pages/usuario/UserAffiliates";
 import UserProfile from "./pages/usuario/UserProfile";
 import GiftCatalog from "./pages/usuario/GiftCatalog";
@@ -39,6 +43,8 @@ import AdminSalesRanking from "./pages/admin/AdminSalesRanking";
 import NotFound from "./pages/NotFound";
 import { ManualPurchasePage } from "./pages/admin/ManualPurchasePage";
 
+// --- CORRECCIÓN AQUÍ: Ruta correcta a 'usuario' ---
+import MyRewards from "./pages/usuario/MyRewards";
 
 const queryClient = new QueryClient();
 
@@ -91,14 +97,12 @@ function AdminRoute({ children }: AdminRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-
-  if (user?.role !== 'admin') {
+  if (user?.role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
 }
-
 
 interface PublicRouteProps {
   readonly children: React.ReactNode;
@@ -153,7 +157,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* Placeholder routes for future pages */}
+
       <Route
         path="/mis-inversiones"
         element={
@@ -188,6 +192,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       {/* Admin Routes */}
       <Route
         path="/admin"
@@ -218,21 +223,16 @@ function AppRoutes() {
             </AppLayout>
           </AdminRoute>
         }
-
-        //NUEVA RUTA PARA INVERSIONES ACTIVAS ADMIN
-
       />
-        <Route
-  // --- AGREGA EL PREFIJO AQUÍ ---
-  path="/admin/inversiones-activas"
-  element={
-    <AdminRoute>
-      <AppLayout>
-        <ActiveInvestmentsPage />
-      </AppLayout>
-    </AdminRoute>
-  }
-        
+      <Route
+        path="/admin/inversiones-activas"
+        element={
+          <AdminRoute>
+            <AppLayout>
+              <ActiveInvestmentsPage />
+            </AppLayout>
+          </AdminRoute>
+        }
       />
       <Route
         path="/admin/commissions"
@@ -323,17 +323,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin/payment-methods"
-        element={
-          <AdminRoute>
-            <AppLayout>
-              <AdminPaymentMethods />
-            </AppLayout>
-          </AdminRoute>
-        }
-      />
-
-      <Route
         path="/admin/ranking"
         element={
           <AdminRoute>
@@ -344,15 +333,15 @@ function AppRoutes() {
         }
       />
       <Route
-      path="/admin/reports/commissions"
-      element={
-        <AdminRoute>
-        <AppLayout>
-          <CommissionsReportsPage />
-          </AppLayout>
-        </AdminRoute>
-      }
-/>
+        path="/admin/reports/commissions"
+        element={
+          <AdminRoute>
+            <AppLayout>
+              <CommissionsReportsPage />
+            </AppLayout>
+          </AdminRoute>
+        }
+      />
       <Route
         path="/admin/profile"
         element={
@@ -363,8 +352,6 @@ function AppRoutes() {
           </AdminRoute>
         }
       />
-
-      {/* Registro de Compra Manual (admin) */}
       <Route
         path="/admin/manual-purchase"
         element={
@@ -392,6 +379,20 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* --- RUTA NUEVA --- */}
+      <Route
+        path="/user/my-rewards"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <MyRewards />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      {/* ----------------- */}
+
       <Route
         path="/my-investments"
         element={
@@ -410,7 +411,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/my-withdrawals"
         element={
@@ -421,7 +421,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/commissions"
         element={
@@ -432,7 +431,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/ranking"
         element={
@@ -443,21 +441,17 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/settings"
         element={
           <ProtectedRoute>
             <div className="min-h-screen flex items-center justify-center">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold mb-4">Configuración</h1>
-                <p className="text-muted-foreground">Próximamente...</p>
-              </div>
+              <h1 className="text-2xl font-bold">Configuración</h1>
             </div>
           </ProtectedRoute>
         }
       />
-      {/* Catch-all route */}
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -476,6 +470,6 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   );
-}
+};
 
 export default App;

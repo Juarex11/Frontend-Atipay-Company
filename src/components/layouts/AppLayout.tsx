@@ -1,18 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "@/contexts/AuthContext";
-import { useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NotificationsDropdown } from "@/components/notifications/NotificationsDropdown";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router-dom"; // Asegúrate que sea react-router-dom
 import { getUserProfile, type UserProfile } from "@/services/userService";
+
+// Importamos los iconos UNA SOLA VEZ
 import {
   TrendingUp,
   BarChart3,
   Users,
   ShoppingCart,
-  Gift,
+  Gift, // <--- Aquí está Gift, solo una vez
   Settings,
   LogOut,
   Menu,
@@ -36,17 +37,14 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Fetch user profile for complete user data - only once per user
   useEffect(() => {
     if (!context?.user?.id) return;
 
     const userId = context.user.id;
     const fetchUserProfile = async () => {
-      // Check if already loaded for this user
       if (userProfile?.id?.toString() === userId) return;
 
       try {
-        // Try to get from localStorage first
         const cachedProfile = localStorage.getItem(`userProfile_${userId}`);
         if (cachedProfile) {
           try {
@@ -54,14 +52,12 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
             setUserProfile(parsed);
             return;
           } catch {
-            // If parsing fails, continue to fetch from API
+            // Error parsing, continue fetch
           }
         }
 
-        // Fetch from API
         const profile = await getUserProfile();
         setUserProfile(profile);
-        // Store in localStorage with user ID as key
         localStorage.setItem(`userProfile_${userId}`, JSON.stringify(profile));
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -102,6 +98,9 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
         { icon: Users, label: "Mi Equipo", href: "/my-affiliates" },
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
         { icon: Gift, label: "Catálogo de Regalos", href: "/gifts" },
+        // --- AQUÍ ESTÁ EL BOTÓN DE MIS PREMIOS ---
+        { icon: Gift, label: "Mis Premios", href: "/user/my-rewards" }, 
+        // -----------------------------------------
         { icon: CreditCard, label: "Mis Transacciones", href: "/transactions" },
         { icon: ArrowLeftRight, label: "Transferencias", href: "/transfers" },
         { icon: Settings, label: "Mi Perfil", href: "/profile" },
@@ -146,7 +145,6 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
           h-screen
         `}
       >
-        {/* Scrollable Content */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex-shrink-0 flex items-center justify-between p-4 sm:p-6">
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -167,7 +165,6 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
             </button>
           </div>
 
-          {/* Scrollable navigation area */}
           <div className="flex-1 overflow-y-auto px-2 sm:px-3 pb-2 scrollbar-thin scrollbar-thumb-green-700 scrollbar-track-green-900/20">
             {/* User Profile Card */}
             <div className="py-2 mb-4">
@@ -259,7 +256,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
           </div>
         </div>
 
-        {/* Logout - Fixed at bottom */}
+        {/* Logout */}
         <div className="flex-shrink-0 border-t border-green-800/50 p-2 sm:p-3">
           <Button
             onClick={logout}
@@ -306,9 +303,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* FIX: Mostrar notificaciones para todos los usuarios autenticados */}
               <NotificationsDropdown />
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -330,7 +325,6 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
           </div>
         </header>
 
-        {/* Page content */}
         <main className="min-h-[calc(100vh-64px)] sm:min-h-[calc(100vh-80px)] p-3 sm:p-4 md:p-6">{children}</main>
       </div>
     </div>

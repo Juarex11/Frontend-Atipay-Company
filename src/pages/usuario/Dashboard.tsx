@@ -34,7 +34,10 @@ import { getMinPointsRequired } from "../../services/commissionService";
 import { RechargeDialog } from "@/components/wallet/RechargeDialog";
 
 // 1. IMPORTAMOS EL MODAL DE CONFETI (Asegúrate que la ruta sea correcta)
-import { AchievementModal, Achievement } from "@/components/common/AchievementModal";
+import {
+  AchievementModal,
+  Achievement,
+} from "@/components/common/AchievementModal";
 
 interface Transfer {
   id: number;
@@ -83,7 +86,8 @@ export default function Dashboard() {
 
   // 2. ESTADOS PARA EL PREMIO
   const [showCelebration, setShowCelebration] = useState(false);
-  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
+  const [currentAchievement, setCurrentAchievement] =
+    useState<Achievement | null>(null);
   const [achievementKey, setAchievementKey] = useState<string>("");
 
   interface Investment extends Omit<ServiceInvestment, "promotion"> {
@@ -101,7 +105,7 @@ export default function Dashboard() {
     recentTransactions: [],
     investments: [],
   });
-  const [targetPoints, setTargetPoints] = useState(0); 
+  const [targetPoints, setTargetPoints] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [chartHistory, setChartHistory] = useState<
     Array<{ name: string; points: number; qualified: boolean }>
@@ -159,10 +163,12 @@ export default function Dashboard() {
         if (response.ok) {
           const result = await response.json();
           if (result.has_achievement) {
-            const data = result.data;
+            const data = result.data; // Aquí ya sacaste los datos de 'result'
+            
             setCurrentAchievement({
               id: Date.now(),
-              title: data.title,
+              key: data.key,       
+              title: data.title,   
               rewardName: data.rewardName,
               message: data.message,
               imageUrl: data.imageUrl,
@@ -545,7 +551,7 @@ export default function Dashboard() {
             </Card>
           </div>
         )}
-        
+
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-800">
@@ -756,14 +762,12 @@ export default function Dashboard() {
           fetchDashboardData();
         }}
       />
-      
       {/* 4. AQUI PONEMOS EL MODAL AL FINAL DEL ARCHIVO */}
       <AchievementModal
         isOpen={showCelebration}
         onClose={handleCloseCelebration}
         achievement={currentAchievement}
       />
-
     </AppLayout>
   );
 }
