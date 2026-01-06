@@ -7,13 +7,14 @@ import {
   DialogTitle, 
   DialogDescription 
 } from "@/components/ui/dialog";
-import { Check, Trophy, Target, Award, Sparkles } from "lucide-react";
+import { Check, Trophy, Target, Award, AlignLeft, Hash } from "lucide-react";
 
 interface LevelData {
   level: number;
   accumulated: number;
   target: number;
-  reward: string;
+  reward: string;      // Título del premio
+  description: string; // Descripción del premio (Nuevo)
   percentage: number;
   is_completed: boolean;
 }
@@ -33,121 +34,139 @@ export const LevelReportModal: React.FC<LevelReportModalProps> = ({
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-[#F0FDF4] p-0 border-none shadow-2xl rounded-[40px] overflow-hidden">
+      <DialogContent className="max-w-2xl bg-[#F0FDF4] p-0 border-none shadow-2xl rounded-[32px] overflow-hidden">
         
-        {/* HEADER: Vibrante y Motivador */}
-        <div className="bg-white p-10 pb-8 rounded-b-[40px] shadow-sm">
+        {/* HEADER */}
+        <div className="bg-white p-8 pb-6 shadow-sm border-b border-emerald-100/50">
           <DialogHeader>
-            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 rounded-[24px] bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                <Trophy className="w-8 h-8" />
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                <Trophy className="w-7 h-7" />
               </div>
               <div>
-                <DialogTitle className="text-3xl font-extrabold text-emerald-900 tracking-tight">
-                  Logros de Red
+                <DialogTitle className="text-2xl font-extrabold text-emerald-950">
+                  Reporte de Niveles
                 </DialogTitle>
-                <DialogDescription className="text-lg text-emerald-600/70 font-medium">
-                  Estatus actual de <span className="text-emerald-700 font-bold underline decoration-emerald-200 underline-offset-4">{username}</span>
+                <DialogDescription className="text-emerald-700/80 font-medium mt-1">
+                  Revisión de afiliaciones para: <span className="text-emerald-800 font-bold underline decoration-emerald-300 underline-offset-2">{username}</span>
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
         </div>
 
-        {/* CONTENIDO: Tarjetas Blancas sobre fondo Esmeralda muy suave */}
-        <div className="p-10 pt-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        {/* LISTA DE NIVELES */}
+        <div className="p-8 space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar bg-[#F8FAFC]">
           {data && data.length > 0 ? (
             data.map((lvl) => (
               <div 
                 key={lvl.level} 
-                className={`bg-white rounded-[32px] p-8 transition-all duration-300 border-2 ${
-                  lvl.is_completed ? 'border-emerald-200 shadow-md' : 'border-white shadow-sm'
+                className={`bg-white rounded-[24px] p-6 transition-all duration-300 border ${
+                  lvl.is_completed ? 'border-emerald-200 shadow-md ring-1 ring-emerald-100' : 'border-gray-100 shadow-sm'
                 }`}
               >
-                {/* NIVEL Y ESTADO */}
-                <div className="flex justify-between items-center mb-6">
+                {/* 1. ENCABEZADO DE LA TARJETA (Nivel y Estado) */}
+                <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black uppercase tracking-widest">
-                      Nivel {lvl.level}
-                    </div>
-                    {lvl.is_completed && (
-                      <div className="flex items-center gap-1 text-emerald-500">
-                        <Sparkles className="w-4 h-4 fill-emerald-500" />
-                      </div>
-                    )}
+                    <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 font-black text-sm">
+                      {lvl.level}
+                    </span>
+                    <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                      Nivel de Red
+                    </span>
                   </div>
                   
                   {lvl.is_completed ? (
-                    <span className="text-xs font-black text-emerald-500 flex items-center gap-1">
-                      <Check className="w-4 h-4" /> COMPLETADO
+                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase flex items-center gap-1.5">
+                      <Check className="w-3 h-3" /> Si Cumple
                     </span>
                   ) : (
-                    <span className="text-xs font-black text-emerald-300 flex items-center gap-1">
-                      <Target className="w-4 h-4" /> EN CAMINO
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase flex items-center gap-1.5">
+                      <Target className="w-3 h-3" /> En Progreso
                     </span>
                   )}
                 </div>
 
-                {/* MÉTRICAS PRINCIPALES */}
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-xs font-bold text-emerald-800/40 uppercase mb-1">Puntos Acumulados</p>
-                    <p className="text-4xl font-black text-emerald-900">
+                {/* 2. SECCIÓN DE PUNTOS (Con etiquetas explícitas) */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-50">
+                    <p className="text-[10px] font-bold text-emerald-800/50 uppercase mb-1 flex items-center gap-1">
+                      <Hash className="w-3 h-3" /> Puntos Acumulados
+                    </p>
+                    <p className="text-2xl font-black text-emerald-900">
                       {lvl.accumulated.toLocaleString()}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-emerald-800/40 uppercase mb-1">Meta del Rango</p>
-                    <p className="text-2xl font-bold text-emerald-700/50">
-                      {lvl.target.toLocaleString()} pts
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center justify-end gap-1">
+                      Meta Requerida <Target className="w-3 h-3" />
+                    </p>
+                    <p className="text-2xl font-black text-gray-600 text-right">
+                      {lvl.target.toLocaleString()}
                     </p>
                   </div>
                 </div>
 
-                {/* BARRA DE PROGRESO PREMIUM */}
-                <div className="space-y-3">
-                  <div className="w-full h-4 bg-emerald-50 rounded-full overflow-hidden border border-emerald-100/50 p-1">
+                {/* Barra de Progreso */}
+                <div className="mb-6">
+                   <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-2">
                     <div 
-                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        lvl.is_completed 
-                          ? 'bg-gradient-to-r from-emerald-400 to-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
-                          : 'bg-emerald-300'
+                      className={`h-full rounded-full transition-all duration-1000 ${
+                        lvl.is_completed ? 'bg-emerald-500' : 'bg-emerald-300'
                       }`}
                       style={{ width: `${lvl.percentage}%` }}
                     />
-                  </div>
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[11px] font-bold text-emerald-800/30 uppercase">Progreso de Red</span>
-                    <span className="text-[11px] font-black text-emerald-600 italic">
-                      {lvl.percentage}% alcanzado
-                    </span>
+                   </div>
+                </div>
+
+                {/* 3. SECCIÓN DE PREMIO (Con Título y Descripción) */}
+                <div className="bg-emerald-950 rounded-2xl p-5 text-white relative overflow-hidden">
+                  {/* Decoración de fondo */}
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/20 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                  
+                  <div className="flex gap-4 relative z-10">
+                    <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Award className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {/* ETIQUETA: TÍTULO */}
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider block mb-0.5">
+                          Título del Premio:
+                        </span>
+                        <p className="font-bold text-lg leading-none">
+                          {lvl.reward || 'Sin Título Asignado'}
+                        </p>
+                      </div>
+
+                      {/* ETIQUETA: DESCRIPCIÓN */}
+                      <div className="pt-2 mt-2 border-t border-emerald-800/50">
+                        <span className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                          <AlignLeft className="w-3 h-3" /> Descripción:
+                        </span>
+                        <p className="text-sm text-emerald-100/80 font-medium leading-snug">
+                          {lvl.description || 'No hay descripción disponible para este nivel.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* SECCIÓN PREMIO: Colorida y clara */}
-                <div className="mt-8 p-5 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
-                    <Award className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] font-black text-emerald-700/50 uppercase tracking-tighter">Recompensa del Nivel</p>
-                    <p className="text-sm font-bold text-emerald-900 uppercase">
-                      {lvl.reward || 'Premio Sorpresa Atipay'}
-                    </p>
-                  </div>
-                </div>
               </div>
             ))
           ) : (
-            <div className="py-20 text-center text-emerald-200 font-bold">Analizando estructura de referidos...</div>
+             <div className="py-20 text-center text-gray-400">
+               <p>Cargando información de niveles...</p>
+             </div>
           )}
         </div>
         
-        {/* FOOTER: Botón Emerald Vibrante */}
-        <div className="p-8 bg-white/50 backdrop-blur-sm flex justify-center border-t border-emerald-100">
+        {/* FOOTER */}
+        <div className="p-6 bg-white border-t border-gray-100 flex justify-center">
             <button 
               onClick={onClose}
-              className="w-full max-w-xs py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-200 transition-all active:scale-95"
+              className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 transition-all"
             >
               Cerrar Reporte
             </button>
