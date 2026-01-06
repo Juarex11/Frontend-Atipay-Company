@@ -4,7 +4,10 @@ import { getSalesRanking } from '../../services/rankingService';
 import type { RankingUser } from '../../types/ranking';
 import { toast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AtipayCoin } from '@/components/ui/AtipayCoin';
+// 1. IMPORTAMOS LA ESTRELLA Y EL ICONO DE GRÁFICO
+import { Star, BarChart3, TrendingUp } from 'lucide-react';
+// 2. IMPORTAMOS EL MODAL DE ESTADÍSTICAS
+import { AffiliateStatsModal } from '@/components/affiliates/AffiliateStatsModal';
 
 const AdminSalesRanking: React.FC = () => {
   const [ranking, setRanking] = useState<RankingUser[]>([]);
@@ -15,6 +18,9 @@ const AdminSalesRanking: React.FC = () => {
   const [viewMode, setViewMode] = useState<'global' | 'mine'>('global');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // --- NUEVO: Estado para el modal de historial ---
+  const [statsUser, setStatsUser] = useState<{id: number, name: string} | null>(null);
   
   const searchRef = useRef<HTMLDivElement>(null);
   const itemsPerPage = 20;
@@ -46,7 +52,6 @@ const AdminSalesRanking: React.FC = () => {
       } else {
         setRanking([]); 
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const message = err.errorData?.message || 'Error al cargar el ranking';
       setError(message);
@@ -60,6 +65,11 @@ const AdminSalesRanking: React.FC = () => {
     setViewMode(mode);
     setPage(1);
     setSearchTerm('');
+  };
+
+  // Función para abrir el modal de estadísticas
+  const handleShowStats = (userId: number, userName: string) => {
+    setStatsUser({ id: userId, name: userName });
   };
 
   return (
@@ -95,7 +105,6 @@ const AdminSalesRanking: React.FC = () => {
             {isSearchOpen && searchTerm.length > 0 && (
               <div className="absolute z-50 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto">
                 {ranking.length > 0 ? (
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   ranking.map((user: any) => (
                     <div
                       key={user.id}
@@ -105,12 +114,10 @@ const AdminSalesRanking: React.FC = () => {
                       <div className="flex flex-col text-left">
                         <span className="text-sm font-bold text-gray-800">{user.username}</span>
                         <span className="text-[10px] text-gray-400 font-medium">{user.email}</span>
-                        {user.phone_number && (
-                          <span className="text-[10px] text-gray-400">{user.phone_number}</span>
-                        )}
                       </div>
                       <div className="text-right flex items-center gap-1">
-                        <AtipayCoin size="xs" />
+                        {/* ESTRELLA EN EL BUSCADOR */}
+                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                         <span className="text-xs font-bold text-green-600">{user.accumulated_points}</span>
                       </div>
                     </div>
@@ -127,12 +134,11 @@ const AdminSalesRanking: React.FC = () => {
           </div>
         </div>
       </div>
+
       <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg md:text-xl font-semibold text-gray-800 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
+            <TrendingUp className="h-5 w-5 text-green-600 mr-2" />
             Todos los Vendedores
           </h2>
           <p className="text-sm text-gray-500 mt-1">Ranking global de vendedores</p>
@@ -157,6 +163,8 @@ const AdminSalesRanking: React.FC = () => {
                   <TableHead className="text-white text-center w-32">PUESTO</TableHead>
                   <TableHead className="text-white">USUARIO</TableHead>
                   <TableHead className="text-white w-40">PUNTOS</TableHead>
+                  {/* NUEVA COLUMNA HISTORIAL */}
+                  <TableHead className="text-white w-20 text-center">HISTORIAL</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -166,36 +174,46 @@ const AdminSalesRanking: React.FC = () => {
                     <TableRow key={user.id} className="hover:bg-gray-50 transition-colors">
                       <TableCell className="text-center w-32">
                         <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-medium ${
-                          realPosition === 1
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : realPosition === 2
-                            ? 'bg-slate-50 text-slate-700 border border-slate-200'
-                            : realPosition === 3
-                            ? 'bg-orange-50 text-orange-700 border border-orange-200'
-                            : 'bg-gray-50 text-gray-600 border border-gray-200'
+                          realPosition === 1 ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : realPosition === 2 ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                          : realPosition === 3 ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                          : 'bg-gray-50 text-gray-600 border border-gray-200'
                         }`}>
                           #{realPosition}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-sm text-gray-900">{user.username}</span>
+                          <span className="text-sm text-gray-900 font-medium">{user.username}</span>
                           {user.phone_number && (
-                            <span className="text-xs text-gray-500 font-medium">{user.phone_number}</span>
+                            <span className="text-xs text-gray-500">{user.phone_number}</span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="w-40">
                         <div className="flex items-center gap-1.5">
-                          <AtipayCoin size="xs" className="text-yellow-500" />
-                          <span className="text-sm font-semibold text-gray-900">{user.accumulated_points.toLocaleString('es-ES')}</span>
+                          {/* CAMBIO: ICONO DE ESTRELLA RELLENA */}
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm font-bold text-gray-900">{user.accumulated_points.toLocaleString('es-ES')}</span>
                         </div>
+                      </TableCell>
+                      {/* BOTÓN DE HISTORIAL */}
+                      <TableCell className="text-center">
+                        <button 
+                          onClick={() => handleShowStats(user.id, user.username)}
+                          className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-green-600"
+                          title="Ver rendimiento mensual"
+                        >
+                          <BarChart3 className="w-5 h-5" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            
+            {/* PAGINACIÓN */}
             <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-gray-50">
               <span className="text-xs font-bold text-gray-400 ml-2 uppercase">Página {page}</span>
               <div className="flex gap-2">
@@ -206,6 +224,14 @@ const AdminSalesRanking: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* MODAL DE ESTADÍSTICAS (GRÁFICO) */}
+      <AffiliateStatsModal 
+        isOpen={!!statsUser} 
+        onClose={() => setStatsUser(null)} 
+        userId={statsUser?.id || null} 
+        userName={statsUser?.name || ''} 
+      />
     </div>
   );
 };

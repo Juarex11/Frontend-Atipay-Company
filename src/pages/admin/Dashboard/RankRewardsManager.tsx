@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Trophy, Save, BarChart3, Settings, 
   Search, RefreshCw, ArrowLeft, ArrowRight,
-  Play, Pause, TrendingUp, Users, Wallet, Filter 
+  Play, Pause, TrendingUp, Users, Wallet, Filter,
+  ClipboardList // ✅ Importamos icono para el reporte
 } from 'lucide-react';
 import { API_BASE_URL } from '@/config';
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+// ✅ IMPORTAMOS EL MODAL QUE CORREGIMOS
+import { LevelReportModal } from '@/components/admin/LevelReportModal';
 
 // --- TIPOS DE DATOS ---
 interface LevelReward {
@@ -40,7 +45,6 @@ interface PaginationData {
   prev_page_url: string | null;
 }
 
-// --- COMPONENTE BOTÓN DE FILTRO (EXTERNO) ---
 const FilterButton = ({ 
   label, 
   isActive, 
@@ -79,7 +83,6 @@ export default function RankRewardsManager() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loadingSave, setLoadingSave] = useState(false);
 
-  // Usamos useCallback para que no cambie en cada render
   const fetchLevels = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/admin/level-rewards`, {
@@ -98,13 +101,17 @@ export default function RankRewardsManager() {
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // ✅ ESTADO PARA EL MODAL DE REPORTE DE NIVELES
+  const [levelReport, setLevelReport] = useState<{ isOpen: boolean; data: any[]; username: string }>({
+    isOpen: false,
+    data: [],
+    username: ''
+  });
   
-  // SOLUCIÓN AL BUCLE: Usamos useRef para saber si ya cargamos datos alguna vez
   const hasLoadedRef = useRef(false);
 
   const fetchHistory = useCallback(async () => {
-    // Solo mostramos spinner si es la primera vez que cargamos o si NO estamos en vivo
-    // Esto evita el parpadeo en el polling
     if (!hasLoadedRef.current) setLoadingHistory(true);
     
     try {
@@ -123,26 +130,39 @@ export default function RankRewardsManager() {
           next_page_url: data.next_page_url,
           prev_page_url: data.prev_page_url
         });
-        hasLoadedRef.current = true; // Marcamos que ya tenemos datos
+        hasLoadedRef.current = true;
       }
     } catch (err) { 
       console.error("Error historial:", err);
     } finally {
       setLoadingHistory(false);
     }
-    // ¡OJO! Quitamos 'pagination' y 'isLive' de las dependencias para evitar el bucle infinito
   }, [token, page, searchTerm, filterLevel]); 
 
-  // Handler para cambiar filtros
-  const handleFilterChange = (level: string) => {
-    if (filterLevel === level) return; // Si es el mismo, no hacemos nada
-    setFilterLevel(level);
-    setPage(1);
-    hasLoadedRef.current = false; // Reseteamos para mostrar loading visual
-    setUsers([]); // Limpiamos tabla visualmente
+  // ✅ FUNCIÓN PARA CARGAR REPORTE DE NIVELES (PEDIDO DE CHRISTOPHER)
+  const handleOpenLevelReport = async (userId: number, username: string) => {
+    try {
+      // Endpoint que calcula el progreso por nivel
+      const res = await fetch(`${API_BASE_URL}/admin/users/${userId}/level-progress`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLevelReport({ isOpen: true, data, username });
+      }
+    } catch (err) {
+      toast.error("No se pudo cargar el reporte de niveles");
+    }
   };
 
-  // Estadísticas (KPIs)
+  const handleFilterChange = (level: string) => {
+    if (filterLevel === level) return;
+    setFilterLevel(level);
+    setPage(1);
+    hasLoadedRef.current = false;
+    setUsers([]);
+  };
+
   const stats = useMemo(() => {
     if (!users.length) return { newThisMonth: 0, totalMoney: 0 };
     const now = new Date();
@@ -156,27 +176,21 @@ export default function RankRewardsManager() {
     return { newThisMonth: newUsers, totalMoney: money };
   }, [users]);
 
-  // Polling y Efectos
   useEffect(() => {
     if (activeTab === 'config') fetchLevels();
     
     if (activeTab === 'monitor') {
-      fetchHistory(); // Carga inicial
-      
+      fetchHistory();
       let intervalId: NodeJS.Timeout;
-      // Solo activamos polling si está En Vivo y no hay búsqueda activa
       if (isLive && searchTerm === '') {
         intervalId = setInterval(() => {
-            // Llamamos a la función directamente
             fetchHistory();
         }, 10000); 
       }
       return () => { if (intervalId) clearInterval(intervalId); };
     }
   }, [activeTab, isLive, searchTerm, fetchLevels, fetchHistory]); 
-  // Al sacar 'pagination' de fetchHistory, fetchHistory ya es estable y este useEffect no se vuelve loco.
 
-  // Handlers Config
   const startEditing = (lvl: LevelReward) => {
     setEditingId(lvl.id);
     setFormData({
@@ -210,7 +224,6 @@ export default function RankRewardsManager() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
@@ -286,7 +299,6 @@ export default function RankRewardsManager() {
       {/* VISTA 2: MONITORIZACIÓN */}
       {activeTab === 'monitor' && (
         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-          
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-600 to-teal-700 text-white">
@@ -313,7 +325,6 @@ export default function RankRewardsManager() {
           {/* BARRA DE FILTROS Y BÚSQUEDA */}
           <div className="flex flex-col gap-4">
             <div className="flex flex-col md:flex-row justify-between gap-4 bg-white p-3 rounded-xl border shadow-sm">
-              {/* Buscador */}
               <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border w-full md:w-64">
                 <Search className="w-4 h-4 text-gray-400" />
                 <Input 
@@ -324,7 +335,6 @@ export default function RankRewardsManager() {
                 />
               </div>
 
-              {/* Botones de Filtro por Nivel */}
               <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                 <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <FilterButton label="Todos" value="all" isActive={filterLevel === 'all'} colorClass="bg-gray-800 text-white" onClick={() => handleFilterChange('all')} />
@@ -346,13 +356,15 @@ export default function RankRewardsManager() {
                       <th className="px-6 py-4">Puntos Acumulados</th>
                       <th className="px-6 py-4">Nivel Estimado</th>
                       <th className="px-6 py-4">Saldo Disponible</th>
+                      {/* ✅ NUEVA COLUMNA DE ACCIONES */}
+                      <th className="px-6 py-4 text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {loadingHistory ? (
-                      <tr><td colSpan={4} className="p-12 text-center text-gray-400"><RefreshCw className="animate-spin w-8 h-8 mx-auto mb-2 opacity-50" /> Cargando datos...</td></tr>
+                      <tr><td colSpan={5} className="p-12 text-center text-gray-400"><RefreshCw className="animate-spin w-8 h-8 mx-auto mb-2 opacity-50" /> Cargando datos...</td></tr>
                     ) : users.length === 0 ? (
-                      <tr><td colSpan={4} className="p-12 text-center text-gray-400">No hay usuarios en este nivel</td></tr>
+                      <tr><td colSpan={5} className="p-12 text-center text-gray-400">No hay usuarios en este nivel</td></tr>
                     ) : (
                       users.map((u) => {
                         let userLevel = 0;
@@ -385,6 +397,18 @@ export default function RankRewardsManager() {
                               {userLevel > 0 ? <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200">Nivel {userLevel}</Badge> : <span className="text-gray-400 text-xs italic">Sin rango</span>}
                             </td>
                             <td className="px-6 py-4 font-bold text-gray-700">S/ {Number(u.atipay_money).toFixed(2)}</td>
+                            {/* ✅ CELDA DE ACCIÓN PARA EL REPORTE */}
+                            <td className="px-6 py-4 text-center">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleOpenLevelReport(u.id, u.username)}
+                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full h-8 w-8 p-0"
+                                title="Ver Reporte por Niveles"
+                              >
+                                <ClipboardList className="w-5 h-5" />
+                              </Button>
+                            </td>
                           </tr>
                         );
                       })
@@ -405,6 +429,14 @@ export default function RankRewardsManager() {
           </div>
         </div>
       )}
+
+      {/* ✅ RENDERIZAMOS EL MODAL DE REPORTE (CON DESCRIPCIÓN PARA ACCESIBILIDAD) */}
+      <LevelReportModal 
+        isOpen={levelReport.isOpen}
+        onClose={() => setLevelReport({ ...levelReport, isOpen: false })}
+        data={levelReport.data}
+        username={levelReport.username}
+      />
     </div>
   );
 }
