@@ -36,7 +36,7 @@ import { RechargeDialog } from "@/components/wallet/RechargeDialog";
 // 1. IMPORTAMOS EL MODAL DE CONFETI (Asegúrate que la ruta sea correcta)
 import {
   AchievementModal,
-  Achievement,
+  type Achievement,
 } from "@/components/common/AchievementModal";
 
 interface Transfer {
