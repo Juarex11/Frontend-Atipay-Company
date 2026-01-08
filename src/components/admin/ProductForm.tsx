@@ -354,6 +354,7 @@ export function ProductForm({ isOpen, onClose, onProductCreated, initialData }: 
               <Input
                 id="points_earned"
                 type="number"
+                step="0.01"
                 {...register('points_earned', {
                   valueAsNumber: true,
                   required: 'Este campo es requerido',

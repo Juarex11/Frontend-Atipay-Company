@@ -60,6 +60,7 @@ export function StoreManagement() {
 
       // --- CORRECCIÓN DEL ERROR DE TIPOS ---
       // Mapeamos los datos para asegurar que no haya nulls donde no debe haberlos
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedProducts = data.map((product: any) => ({
         ...product,
         isActive: product.status === 'active',
