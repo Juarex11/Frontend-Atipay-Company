@@ -20,7 +20,6 @@ import {
   Upload,
   Image as ImageIcon,
   X,
-  AlertCircle,
 } from "lucide-react";
 
 import {

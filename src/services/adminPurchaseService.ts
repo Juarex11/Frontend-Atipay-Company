@@ -406,3 +406,15 @@ export const deletePack = async (id: number) => {
     }
     return await response.json();
 };
+export const deleteConversionRule = async (id: number | string) => {
+    const response = await fetch(`${API_URL}/admin/conversion-rules/${id}`, { 
+        method: 'DELETE', 
+        headers: getAuthHeaders() 
+    });
+    
+    if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.message || 'Error al eliminar regla');
+    }
+    return await response.json();
+};
