@@ -212,6 +212,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
               </label>
               <input
                 type="number"
+                step="0.01"
                 name="redeem_points"
                 min="0"
                 value={pointsValue}
