@@ -438,11 +438,11 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                 <div className="flex gap-3">
                                     <div className="flex-1">
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Precio (S/)</label>
-                                        <input type="number" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} placeholder="0.00"/>
+                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} placeholder="0.00"/>
                                     </div>
                                     <div className="flex-1">
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Puntos Base</label>
-                                        <input type="number" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} placeholder="0"/>
+                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} placeholder="0"/>
                                     </div>
                                 </div>
                                 <button onClick={()=> {
@@ -651,7 +651,7 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                         {useGlobalConversion ? (
                                             <span className="font-bold text-purple-700 bg-purple-50 px-3 py-1 rounded-lg text-sm">{autoVal.toFixed(2)}</span>
                                         ) : (
-                                            <input type="number" className="w-24 text-right border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                                            <input type="number" min="0" className="w-24 text-right border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
                                                 value={displayVal}
                                                 onChange={e => setManualPoints({...manualPoints, [p.id]: parseFloat(e.target.value)})}
                                                 onBlur={e => setManualPoints({...manualPoints, [p.id]: toDec(parseFloat(e.target.value || "0"))})}
@@ -678,7 +678,7 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                         {useGlobalConversion ? (
                                             <span className="font-bold text-purple-700 bg-white px-3 py-1 rounded-lg text-sm shadow-sm border border-purple-100">{autoVal.toFixed(2)}</span>
                                         ) : (
-                                            <input type="number" className="w-24 text-right border border-purple-200 bg-white rounded-lg px-3 py-1.5 text-sm font-bold text-purple-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+                                            <input type="number" min="0" className="w-24 text-right border border-purple-200 bg-white rounded-lg px-3 py-1.5 text-sm font-bold text-purple-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
                                                 value={displayVal}
                                                 onChange={e => setCustomManualPoints({...customManualPoints, [p.tempId]: parseFloat(e.target.value)})}
                                                 onBlur={e => setCustomManualPoints({...customManualPoints, [p.tempId]: toDec(parseFloat(e.target.value || "0"))})}
