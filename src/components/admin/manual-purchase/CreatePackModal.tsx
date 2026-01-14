@@ -20,6 +20,12 @@ const toDec = (num: number | string | undefined) => {
     return Math.round(n * 100) / 100;
 };
 
+// --- FUNCIÓN DE VALIDACIÓN PARA PUNTOS NO NEGATIVOS (DRY) ---
+const clampToNonNegative = (value: string | number): number => {
+    const parsed = parseFloat(String(value || 0));
+    return isNaN(parsed) ? 0 : Math.max(0, parsed);
+};
+
 // --- COMPONENTES VISUALES ---
 const CustomAlert = ({ type, title, message, onClose }: any) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in">
@@ -438,16 +444,18 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                 <div className="flex gap-3">
                                     <div className="flex-1">
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Precio (S/)</label>
-                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} placeholder="0.00"/>
+                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPrice} onChange={e=>setNewItemPrice(e.target.value)} onBlur={e=>setNewItemPrice(String(clampToNonNegative(e.target.value)))} placeholder="0.00"/>
                                     </div>
                                     <div className="flex-1">
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Puntos Base</label>
-                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} placeholder="0"/>
+                                        <input type="number" min="0" className="w-full border p-2 rounded-lg text-sm focus:border-purple-500 outline-none" value={newItemPoints} onChange={e=>setNewItemPoints(e.target.value)} onBlur={e=>setNewItemPoints(String(clampToNonNegative(e.target.value)))} placeholder="0"/>
                                     </div>
                                 </div>
                                 <button onClick={()=> {
                                     if(!newItemName || !newItemPrice) return setAlertState({type:'warning', title:'Faltan Datos', message:'Debes ingresar al menos el nombre y el precio.'});
-                                    setCustomItems(prev=>[...prev, {tempId: Date.now(), name: newItemName, price: parseFloat(newItemPrice), points: toDec(parseFloat(newItemPoints||'0')), image: newItemImage, imagePreview: newItemImage?URL.createObjectURL(newItemImage):null}]);
+                                    const safePrice = clampToNonNegative(newItemPrice);
+                                    const safePoints = clampToNonNegative(newItemPoints || '0');
+                                    setCustomItems(prev=>[...prev, {tempId: Date.now(), name: newItemName, price: safePrice, points: toDec(safePoints), image: newItemImage, imagePreview: newItemImage?URL.createObjectURL(newItemImage):null}]);
                                     setShowQuickCreate(false); setNewItemName(""); setNewItemPrice(""); setNewItemPoints(""); setNewItemImage(null);
                                 }} className="w-full bg-purple-600 text-white p-2.5 rounded-lg font-bold text-sm hover:bg-purple-700 shadow-md transition-transform active:scale-95">
                                     Agregar al Pack
@@ -653,8 +661,8 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                         ) : (
                                             <input type="number" min="0" className="w-24 text-right border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
                                                 value={displayVal}
-                                                onChange={e => setManualPoints({...manualPoints, [p.id]: parseFloat(e.target.value)})}
-                                                onBlur={e => setManualPoints({...manualPoints, [p.id]: toDec(parseFloat(e.target.value || "0"))})}
+                                                onChange={e => setManualPoints({...manualPoints, [p.id]: clampToNonNegative(e.target.value)})}
+                                                onBlur={e => setManualPoints({...manualPoints, [p.id]: toDec(clampToNonNegative(e.target.value))})}
                                             />
                                         )}
                                     </td>
@@ -680,8 +688,8 @@ export const CreatePackModal: React.FC<CreatePackModalProps> = ({ isOpen, onClos
                                         ) : (
                                             <input type="number" min="0" className="w-24 text-right border border-purple-200 bg-white rounded-lg px-3 py-1.5 text-sm font-bold text-purple-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
                                                 value={displayVal}
-                                                onChange={e => setCustomManualPoints({...customManualPoints, [p.tempId]: parseFloat(e.target.value)})}
-                                                onBlur={e => setCustomManualPoints({...customManualPoints, [p.tempId]: toDec(parseFloat(e.target.value || "0"))})}
+                                                onChange={e => setCustomManualPoints({...customManualPoints, [p.tempId]: clampToNonNegative(e.target.value)})}
+                                                onBlur={e => setCustomManualPoints({...customManualPoints, [p.tempId]: toDec(clampToNonNegative(e.target.value))})}
                                             />
                                         )}
                                     </td>
