@@ -314,7 +314,7 @@ export const DepositDialog = ({
                 {proofImage && (
                   <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
                     <svg
-                      xmlns="http://www.w3.org/2000/svg"
+                      xmlns="https://www.w3.org/2000/svg"
                       className="h-4 w-4"
                       viewBox="0 0 20 20"
                       fill="currentColor"

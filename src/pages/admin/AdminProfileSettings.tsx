@@ -71,7 +71,7 @@ export default function AdminProfileSettings() {
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`https error! status: ${response.status}`);
         }
 
         const contentType = response.headers.get('content-type');

@@ -87,7 +87,7 @@ export const productService = {
         // Para otros errores, intentar obtener el mensaje de error del servidor
         try {
           const errorData = await response.json();
-          throw new Error(errorData.message || `Error HTTP! Estado: ${response.status}`);
+          throw new Error(errorData.message || `Error https! Estado: ${response.status}`);
         } catch {
           // Ignoramos el error de parsing y lanzamos un mensaje genérico
           throw new Error(`Error al cargar los productos (${response.status} ${response.statusText})`);

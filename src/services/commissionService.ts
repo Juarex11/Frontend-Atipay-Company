@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { API_BASE_URL } from '../config';
 import type {CommissionHistoryItem, CommissionHistoryResponse, WithdrawalHistoryItem, WithdrawalHistoryResponse} from '../types/commission';
 
@@ -28,6 +29,9 @@ export interface CommissionSetting {
   id?: number;
   level: number;
   percentage: number;
+  min_points?: number; // Agregado para coincidir con tu base de datos
+  reward_text?: string;
+  reward_message?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -131,7 +135,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return response.json();
 };
 
-export const getCommissionSettings = async (): Promise<CommissionSetting[]> => {
+export const getCommissionSettings = async (): Promise<any> => {
   const token = localStorage.getItem('token');
   
   const response = await fetch(`${API_BASE_URL}/commissions/settings`, {
@@ -141,7 +145,24 @@ export const getCommissionSettings = async (): Promise<CommissionSetting[]> => {
     },
   });
   
-  return handleResponse<CommissionSetting[]>(response);
+  // 1. Procesamos la respuesta UNA SOLA VEZ
+  const result = await handleResponse<any>(response);
+  
+  // 2. VERIFICACIÓN DE ESTRUCTURA:
+  // Si Laravel envía { data: [...] }
+  if (result && result.data && Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  // Si Laravel envió la lista pura directamente [...]
+  if (Array.isArray(result)) {
+    return result;
+  }
+
+  // 3. RETORNO SEGURO:
+  // Si llegamos aquí, devolvemos el result original o un array vacío si no hay nada
+  return result || []; 
+  // ¡IMPORTANTE!: Quitamos la línea que decía: return handleResponse(response);
 };
 
 // === FUNCIÓN PARA OBTENER EL HISTORIAL COMBINADO ===

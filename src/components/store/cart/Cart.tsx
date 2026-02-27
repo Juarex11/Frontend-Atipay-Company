@@ -194,7 +194,7 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                         {/* --- Puntos Ganados por Producto (RF-07) --- */}
                         {item.pointsEarned && item.pointsEarned > 0 && (
                           <div className="flex items-center gap-2 text-xs text-yellow-600">
-                            <svg className="w-3.5 h-3.5 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                            <svg className="w-3.5 h-3.5 fill-yellow-400" xmlns="https://www.w3.org/2000/svg" viewBox="0 0 24 24">
                               <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
                             </svg>
                             <span className="font-semibold text-yellow-700">
@@ -237,7 +237,7 @@ export function Cart({ isOpen, onOpenChange }: CartProps) {
                         Puntos que ganarás
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <svg className="w-5 h-5 text-yellow-600 fill-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-yellow-600 fill-yellow-400" xmlns="https://www.w3.org/2000/svg" viewBox="0 0 24 24">
                           <path d="M12 2l3.09 6.26l6.91 1l-5 4.86l1.18 6.88l-6.18-3.25l-6.18 3.25l1.18-6.88l-5-4.86l6.91-1z" fill="currentColor"/>
                         </svg>
                         <span className="font-bold text-xl text-yellow-700">

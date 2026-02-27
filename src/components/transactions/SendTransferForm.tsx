@@ -138,7 +138,7 @@ export const SendTransferForm = ({ availableBalance, onTransferComplete }: SendT
       }
 
       // Intentar buscar por username, email o teléfono
-      const response = await fetch(`https://127.0.0.1:8000/api/partners/find/${encodeURIComponent(searchTerm)}`, {
+      const response = await fetch(`https://back.mibolsillo.site/api/partners/find/${encodeURIComponent(searchTerm)}`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`

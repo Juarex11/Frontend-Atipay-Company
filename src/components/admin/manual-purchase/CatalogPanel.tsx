@@ -340,9 +340,9 @@ export const CatalogPanel = ({
   const getPackImage = (pack: any) => {
     let path = pack.image_url || pack.image_path || pack.image;
     if (!path) return null;
-    if (typeof path === "string" && path.startsWith("http")) return path;
+    if (typeof path === "string" && path.startsWith("https")) return path;
     path = path.replace("public/", "");
-    return `http://127.0.0.1:8000/storage/${path}`;
+    return `https://back.mibolsillo.site/storage/${path}`;
   };
 
   return (

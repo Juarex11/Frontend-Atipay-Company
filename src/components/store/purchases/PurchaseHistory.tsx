@@ -101,15 +101,15 @@ const PurchaseHistory: React.FC = () => {
     status?: string;
   } | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+  const API_BASE = import.meta.env.VITE_API_BASE || "https://back.mibolsillo.site";
 
-  // Construye URL absoluta y corrige localhost -> 127.0.0.1:8000
+  // Construye URL absoluta y corrige localhost -> back.mibolsillo.site
   function makeFullUrl(path?: string | null) {
     if (!path) return null;
     if (path.includes("localhost")) {
-      return path.replace("localhost", "127.0.0.1:8000");
+      return path.replace("localhost", "back.mibolsillo.site");
     }
-    if (path.startsWith("http")) return path;
+    if (path.startsWith("https")) return path;
     const clean = path.startsWith("/") ? path : `/${path}`;
     if (clean.startsWith("/storage")) return `${API_BASE}${clean}`;
     return `${API_BASE}/storage${clean}`;
@@ -219,8 +219,8 @@ const PurchaseHistory: React.FC = () => {
   }
 
   /* ===========================
-     Render principal
-     =========================== */
+      Render principal
+      =========================== */
   return (
     <div className="space-y-6">
       {/* Modales */}
@@ -290,7 +290,8 @@ const PurchaseHistory: React.FC = () => {
         {/* Info destacado */}
         <div className="text-xs text-gray-500 flex items-center gap-2">
           <Clock className="w-4 h-4 text-gray-400" />
-          <span>Formato: JPG/PNG · Máx 5MB · Solo Depósito / Atipay</span>
+          {/* CAMBIO: Texto visual actualizado a 10MB y nuevos formatos */}
+          <span>Formato: JPG/PNG/WEBP · Máx 10MB · Solo Depósito / Atipay</span>
         </div>
       </div>
 

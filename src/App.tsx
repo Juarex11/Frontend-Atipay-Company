@@ -9,7 +9,7 @@ import {
   Route,
   Navigate,
   useLocation,
-} from "react-router-dom"; // Corregido a react-router-dom
+} from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import Login from "./pages/Login";
@@ -42,9 +42,8 @@ import SalesRanking from "./pages/SalesRanking";
 import AdminSalesRanking from "./pages/admin/AdminSalesRanking";
 import NotFound from "./pages/NotFound";
 import { ManualPurchasePage } from "./pages/admin/ManualPurchasePage";
-
-// --- CORRECCIÓN AQUÍ: Ruta correcta a 'usuario' ---
 import MyRewards from "./pages/usuario/MyRewards";
+import useAutoLogout from "./hooks/useAutoLogout";
 
 const queryClient = new QueryClient();
 
@@ -130,6 +129,10 @@ function PublicRoute({ children }: PublicRouteProps) {
 }
 
 function AppRoutes() {
+  // Esto iniciará el cronómetro en cuanto la app cargue.
+  // Como está dentro de <BrowserRouter> (en el componente App), funcionará perfecto.
+  useAutoLogout(); 
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />

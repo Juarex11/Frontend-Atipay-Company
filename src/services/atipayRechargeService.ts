@@ -165,6 +165,7 @@ const handleResponse = async <T = unknown>(response: Response): Promise<T> => {
 interface CreateRechargeResponse {
   message: string;
   data: {
+    estado: string;
     full_names: string;
     amount: number;
     user_payment_method_id: string;

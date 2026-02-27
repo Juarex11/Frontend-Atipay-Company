@@ -1,33 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import type { PaymentMethod } from "@/types/transaction.types";
+// Importamos el servicio que ya tienes creado
+import { getUserPaymentMethods, type UserPaymentMethod } from "@/services/userPaymentMethodService"; 
 
 interface RechargeDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly amount: number;
-  readonly onSubmit: (paymentMethod: PaymentMethod) => Promise<void>;
+  readonly onSubmit: (paymentMethodId: number) => Promise<void>; // Cambiamos para que reciba un número
   readonly isLoading: boolean;
 }
 
 export function RechargeDialog({ open, onOpenChange, amount, onSubmit, isLoading }: RechargeDialogProps) {
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('yape');
+  // Ahora guardamos el ID numérico que viene de la base de datos
+  const [selectedMethodId, setSelectedMethodId] = useState<string>(''); 
+  const [userMethods, setUserMethods] = useState<UserPaymentMethod[]>([]);
+  const [isLoadingMethods, setIsLoadingMethods] = useState(true);
 
-  const paymentMethods = [
-    { value: 'yape', label: 'Yape' },
-    { value: 'plin', label: 'Plin' },
-    { value: 'tunki', label: 'Tunki' },
-    { value: 'bcp', label: 'BCP' },
-    { value: 'interbank', label: 'Interbank' },
-    { value: 'bbva', label: 'BBVA' },
-  ];
+  // Cargar los métodos del usuario cuando se abre el modal
+  useEffect(() => {
+    if (open) {
+      const loadMethods = async () => {
+        setIsLoadingMethods(true);
+        try {
+          const methods = await getUserPaymentMethods();
+          setUserMethods(methods);
+          
+          // Seleccionar el primero por defecto si tiene métodos
+          if (methods.length > 0) {
+            setSelectedMethodId(methods[0].id.toString());
+          }
+        } catch (error) {
+          console.error("Error al cargar métodos de pago:", error);
+        } finally {
+          setIsLoadingMethods(false);
+        }
+      };
+      
+      loadMethods();
+    }
+  }, [open]);
 
   const handleSubmit = async () => {
-    await onSubmit(paymentMethod);
+    if (!selectedMethodId) return;
+    // Enviamos el ID real como número
+    await onSubmit(Number(selectedMethodId)); 
   };
 
   return (
@@ -42,22 +63,34 @@ export function RechargeDialog({ open, onOpenChange, amount, onSubmit, isLoading
         
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Método de pago</Label>
-            <Select 
-              value={paymentMethod} 
-              onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un método de pago" />
-              </SelectTrigger>
-              <SelectContent>
-                {paymentMethods.map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    {method.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="paymentMethod">Tus métodos de pago</Label>
+            
+            {isLoadingMethods ? (
+              <div className="flex items-center text-sm text-gray-500">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cargando tus cuentas...
+              </div>
+            ) : userMethods.length === 0 ? (
+               <div className="text-sm text-red-500 bg-red-50 p-3 rounded border border-red-200">
+                 No tienes métodos de pago registrados. Por favor, agrega uno en tu perfil antes de recargar.
+               </div>
+            ) : (
+              <Select 
+                value={selectedMethodId} 
+                onValueChange={setSelectedMethodId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un método de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userMethods.map((method) => (
+                    <SelectItem key={method.id} value={method.id.toString()}>
+                      {/* Mostramos el nombre (ej: Yape) y un dato extra (ej: el número) para que el usuario los distinga */}
+                      {method.method.name} - {method.data.Número || method.data.CCI || 'Cuenta'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
@@ -87,7 +120,7 @@ export function RechargeDialog({ open, onOpenChange, amount, onSubmit, isLoading
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading || !selectedMethodId || userMethods.length === 0}
           >
             {isLoading ? (
               <>

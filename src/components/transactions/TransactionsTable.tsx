@@ -24,6 +24,17 @@ const TransactionDetailsModal = ({
 }) => {
   if (!isOpen) return null;
 
+  // MAPEO PARA EL MODAL
+  const methodNamesMap: Record<string, string> = {
+    "1": "Yape",
+    "3": "Plin",
+    "4": "Transferencia Bancaria",
+  };
+  
+  // Buscamos el nombre real usando el ID o los campos de texto
+  const methodId = (transaction.user_payment_method_id || transaction.payment_method_name || transaction.method || "").toString();
+  const resolvedMethod = methodNamesMap[methodId] || transaction.payment_method_name || transaction.method || 'No especificado';
+
   const getStatusIcon = () => {
     switch (transaction.status) {
       case 'pending':
@@ -64,7 +75,7 @@ const TransactionDetailsModal = ({
                 <CreditCard className="w-4 h-4" />
                 Método de pago
               </p>
-              <p className="font-medium capitalize">{transaction.payment_method_name || transaction.method || 'No especificado'}</p>
+              <p className="font-medium capitalize">{resolvedMethod}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500 flex items-center justify-end gap-2">
@@ -148,7 +159,7 @@ const TransactionDetailsModal = ({
 
 // Tipo extendido para incluir información del método de pago
 interface TransactionWithPaymentMethod extends Omit<Transaction, 'reference'> {
-  reference?: string; // Hacer reference opcional ya que la API no lo envía
+  reference?: string; 
   user_payment_method_id?: number;
   payment_method_name?: string;
 }
@@ -161,37 +172,42 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithPaymentMethod | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Función para obtener el color del método de pago
+  // MAPEO DE IDs A NOMBRES (Asegúrate que coincidan con los de tu Stepper)
+  const methodNamesMap: Record<string, string> = {
+    "1": "Yape",
+    "3": "Plin",
+    "4": "Transferencia Bancaria",
+  };
+
   const getMethodColor = (methodName: string): string => {
     const method = methodName.toLowerCase();
     if (method.includes('yape')) return 'bg-purple-50 text-purple-700';
     if (method.includes('plin')) return 'bg-orange-50 text-orange-700';
-    if (method.includes('bcp') || method.includes('banco')) return 'bg-blue-50 text-blue-700';
+    if (method.includes('bcp') || method.includes('banco') || method.includes('transferencia')) return 'bg-blue-50 text-blue-700';
     if (method.includes('bbva')) return 'bg-blue-50 text-blue-700';
     if (method.includes('interbank')) return 'bg-yellow-50 text-yellow-700';
     if (method.includes('scotiabank')) return 'bg-red-50 text-red-700';
     if (method.includes('bonificación') || method.includes('bonus')) return 'bg-green-50 text-green-700';
-    return 'bg-gray-50 text-gray-700'; // color por defecto
+    return 'bg-gray-50 text-gray-700';
   };
 
   const handleViewClick = (transaction: TransactionWithPaymentMethod) => {
     setSelectedTransaction(transaction);
     setIsModalOpen(true);
   };
+
   const getLocalStatusText = (status: string) => {
-    // Forzamos que 'pending' o 'earring' digan "Pendiente"
     if (status === 'pending' || status === 'earring') return 'Pendiente';
-    // Para los demás (approved, rejected), usamos la función original
     return getStatusText(status); 
   };
 
   const getLocalStatusColor = (status: string) => {
-    // Forzamos el color amarillo para pendientes
     if (status === 'pending' || status === 'earring') {
       return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100';
     }
     return getStatusColor(status);
   };
+
   return (
     <>
       <Table>
@@ -207,7 +223,10 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
         </TableHeader>
         <TableBody>
           {transactions.map((transaction) => {
-            // Create a unique key by combining ID and reference (or another unique field)
+            // RESOLVEMOS EL NOMBRE USANDO TAMBIÉN EL ID
+            const methodId = (transaction.user_payment_method_id || "").toString();
+            const resolvedMethod = methodNamesMap[methodId] || transaction.payment_method_name || transaction.method || 'Método desconocido';
+
             const uniqueKey = `${transaction.id}_${transaction.reference || transaction.date}`;
             return (
               <TableRow key={uniqueKey}>
@@ -233,10 +252,10 @@ export const TransactionsTable = ({ transactions }: TransactionsTableProps) => {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${getMethodColor(transaction.payment_method_name || transaction.method || '')}`}>
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${getMethodColor(resolvedMethod)}`}>
                       <CreditCard className="w-4 h-4" />
                       <span className="text-sm font-medium">
-                        {transaction.payment_method_name || transaction.method || 'Método desconocido'}
+                        {resolvedMethod}
                       </span>
                     </div>
                   </div>

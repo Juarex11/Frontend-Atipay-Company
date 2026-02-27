@@ -386,27 +386,23 @@ export default function Dashboard() {
             </Card>
 
             {/* Puntos Acumulados Card */}
-            <Card className="bg-gradient-to-br from-teal-700 to-teal-900 text-white border-0">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/90">
-                  Puntos de Acumulados
-                </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <AtipayCoin size="sm" className="text-white" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  <div className="flex items-center gap-1">
-                    <AtipayCoin size="xs" className="w-4 h-4 text-white" />
-                    <span>{dashboardData.points.toLocaleString()}</span>
-                  </div>
-                </div>
-                <p className="text-xs text-white/80">
-                  Acumulados por tus transacciones
-                </p>
-              </CardContent>
-            </Card>
+<Card className="bg-gradient-to-br from-teal-700 to-teal-900 text-white border-0">
+  {/* ... (header igual) ... */}
+  <CardContent>
+    <div className="text-2xl font-bold text-white">
+      <div className="flex items-center gap-1">
+        <AtipayCoin size="xs" className="w-4 h-4 text-white" />
+        
+        {/* ✅ CAMBIO AQUÍ: Usamos toFixed(2) para forzar 2 decimales siempre */}
+        <span>{Number(dashboardData.points).toFixed(2)}</span>
+        
+      </div>
+    </div>
+    <p className="text-xs text-white/80">
+      Acumulados por tus transacciones
+    </p>
+  </CardContent>
+</Card>
 
             {/* Inversiones Activas Card */}
             <Card className="bg-gradient-to-br from-lime-700 to-lime-900 text-white border-0">
@@ -441,13 +437,14 @@ export default function Dashboard() {
           </h2>
           {/* Inicio del Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6"></div>
-          {/* Columna Izquierda: Estado de Calificación */}
-          <div className="lg:col-span-5">
-            <QualificationStatus
-              puntosActuales={dashboardData.points}
-              puntosMeta={targetPoints} // <--- ¡AQUÍ ESTÁ EL PROBLEMA! Está fijo en 93
-            />
-          </div>
+          {/* COLUMNA IZQUIERDA (Estado de Calificación) */}
+<div className="lg:col-span-5">
+    <QualificationStatus 
+        // ✅ CAMBIO AQUÍ: Redondeamos el número antes de enviarlo
+        puntosActuales={Number(Number(dashboardData.points).toFixed(2))}
+        puntosMeta={93} // O la meta que configures
+    />
+</div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Columna Derecha: Gráfica Anual */}

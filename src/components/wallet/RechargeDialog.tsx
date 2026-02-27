@@ -29,19 +29,15 @@ interface RechargeDialogProps {
   onRechargeSuccess?: () => void;
 }
 
-// 1. ESTILOS VISUALES (Colores e Iconos)
 const METHOD_STYLES: Record<string, { color: string; label: string; icon: any }> = {
   "1": { color: "bg-purple-700", label: "Yape Oficial", icon: Smartphone },
   "3": { color: "bg-orange-500", label: "Plin Oficial", icon: Smartphone },
   "4": { color: "bg-slate-900", label: "Cuenta Recaudadora", icon: Building2 },
 };
 
-// 2. DATOS FIJOS (Para Yape y Plin según tu imagen)
-// Si en el futuro quieres que esto venga de BD, habría que crear un endpoint nuevo.
-// Por ahora, esto es lo más rápido y efectivo.
 const STATIC_INFO: Record<string, string> = {
-  "1": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe", // Datos de Yape
-  "3": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe", // Datos de Plin (Asumimos el mismo número)
+  "1": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe",
+  "3": "Número: 906289965\nTitular: Milenco Carhuamaca Quispe",
 };
 
 export function RechargeDialog({
@@ -56,7 +52,6 @@ export function RechargeDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Info a mostrar en la tarjeta
   const [displayInfo, setDisplayInfo] = useState<string | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -64,40 +59,31 @@ export function RechargeDialog({
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Lógica inteligente para cargar la información
   useEffect(() => {
-    // Si elegimos un método válido (1, 3 o 4)
     if (["1", "3", "4"].includes(paymentMethodId)) {
-      
-      // CASO A: Es Yape (1) o Plin (3) -> Usamos la info estática (Instantáneo)
       if (STATIC_INFO[paymentMethodId]) {
         setDisplayInfo(STATIC_INFO[paymentMethodId]);
         setLoadingInfo(false);
       } 
-      // CASO B: Es Transferencia (4) -> Consultamos al Backend (System Settings)
       else if (paymentMethodId === "4") {
-  const fetchBank = async () => {
-    setLoadingInfo(true);
-    try {
-      // 1. Llamamos al servicio que conecta con la Base de Datos
-      const res = await DepositService.getBankInfo();
-      
-      // 2. Si la BD responde, actualizamos el estado
-      if (res.success && res.data) {
-        setDisplayInfo(res.data); // <--- ¡AQUÍ SE PONE EL DATO DE LA BD!
-      } else {
-        // Fallback por si la BD está vacía
-        setDisplayInfo("La cuenta bancaria no está configurada. Contacte a soporte.");
+        const fetchBank = async () => {
+          setLoadingInfo(true);
+          try {
+            const res = await DepositService.getBankInfo();
+            if (res.success && res.data) {
+              setDisplayInfo(res.data);
+            } else {
+              setDisplayInfo("La cuenta bancaria no está configurada. Contacte a soporte.");
+            }
+          } catch (e) {
+            console.error(e);
+            setDisplayInfo("Error de conexión.");
+          } finally {
+            setLoadingInfo(false);
+          }
+        };
+        fetchBank();
       }
-    } catch (e) {
-      console.error(e);
-      setDisplayInfo("Error de conexión.");
-    } finally {
-      setLoadingInfo(false);
-    }
-  };
-  fetchBank();
-}
     } else {
       setDisplayInfo(null);
     }
@@ -122,13 +108,14 @@ export function RechargeDialog({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ["image/jpeg", "image/png", "application/pdf"];
+      const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp", "application/pdf"];
       if (!validTypes.includes(file.type)) {
-        setError("Por favor sube una imagen (JPEG, PNG) o un PDF");
+        setError("Por favor sube una imagen (JPG, PNG, WEBP) o un PDF");
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setError("El archivo es demasiado grande (Máx 5MB)");
+      // CAMBIO: Límite aumentado a 10MB para coincidir con el backend
+      if (file.size > 10 * 1024 * 1024) {
+        setError("El archivo es demasiado grande (Máx 10MB)");
         return;
       }
       setProofImage(file);
@@ -164,7 +151,6 @@ export function RechargeDialog({
     }
   };
 
-  // Obtener estilos según ID
   const currentStyle = METHOD_STYLES[paymentMethodId] || { color: "bg-slate-900", label: "Información", icon: Wallet };
   const HeaderIcon = currentStyle.icon;
 
@@ -177,7 +163,6 @@ export function RechargeDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 mt-2">
-          {/* MONTO */}
           <div className="space-y-2">
             <Label htmlFor="amount">Monto (S/.)</Label>
             <div className="relative">
@@ -196,7 +181,6 @@ export function RechargeDialog({
             </div>
           </div>
 
-          {/* MÉTODO DE PAGO */}
           <div className="space-y-2">
             <Label htmlFor="method">Método de pago</Label>
             <Select value={paymentMethodId} onValueChange={setPaymentMethodId} disabled={isLoading}>
@@ -211,7 +195,6 @@ export function RechargeDialog({
             </Select>
           </div>
 
-          {/* TARJETA DE INFORMACIÓN DINÁMICA */}
           {["1", "3", "4"].includes(paymentMethodId) && (
             <div className="animate-in fade-in zoom-in-95 duration-300">
               {loadingInfo ? (
@@ -220,7 +203,6 @@ export function RechargeDialog({
                 </div>
               ) : (
                 <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                  {/* Cabecera de Color (Morado/Naranja/Negro) */}
                   <div className={`${currentStyle.color} px-4 py-3 flex items-center justify-between transition-colors duration-300`}>
                     <div className="flex items-center gap-2 text-white">
                       <div className="p-1.5 bg-white/20 rounded shadow-lg backdrop-blur-sm">
@@ -233,10 +215,8 @@ export function RechargeDialog({
                     </div>
                   </div>
 
-                  {/* Cuerpo Info */}
                   <div className="p-4 bg-gradient-to-b from-white to-slate-50/50">
                     <div className="relative mb-3 group">
-                      {/* Aquí se muestra la info del objeto STATIC_INFO o del Backend */}
                       <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-mono text-xs leading-relaxed whitespace-pre-wrap shadow-inner min-h-[60px]">
                         {displayInfo}
                       </div>
@@ -250,7 +230,6 @@ export function RechargeDialog({
                       </button>
                     </div>
 
-                    {/* Botón Historial */}
                     <div className="pt-2 border-t border-slate-100 mt-2">
                         <Button 
                           type="button" 
@@ -270,7 +249,6 @@ export function RechargeDialog({
             </div>
           )}
 
-          {/* COMPROBANTE */}
           <div className="space-y-2">
             <Label htmlFor="proof">Comprobante</Label>
             <Label
@@ -281,7 +259,8 @@ export function RechargeDialog({
             >
               {proofImage ? <CheckCircle2 className="mb-2 h-8 w-8 text-green-500"/> : <Upload className="mb-2 h-8 w-8 text-slate-400"/>}
               <span className="text-sm font-medium text-slate-700">{proofImage ? proofImage.name : "Clic para subir imagen"}</span>
-              <span className="text-xs text-slate-400 mt-1">{proofImage ? "Listo para enviar" : "JPG, PNG (Máx. 5MB)"}</span>
+              {/* CAMBIO: Texto visual actualizado a 10MB */}
+              <span className="text-xs text-slate-400 mt-1">{proofImage ? "Listo para enviar" : "JPG, PNG (Máx. 10MB)"}</span>
               <Input id="proof" type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={isLoading} />
             </Label>
           </div>
@@ -302,4 +281,4 @@ export function RechargeDialog({
       </DialogContent>
     </Dialog>
   );
-}
+} 

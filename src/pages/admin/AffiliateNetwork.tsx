@@ -1,10 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft } from "lucide-react";
 
 import {
   referralService,
@@ -72,7 +69,7 @@ export default function AffiliateNetwork() {
         users: level.users.filter(
           (u) =>
             u.username.toLowerCase().includes(term) ||
-            u.email.toLowerCase().includes(term)
+            u.email.toLowerCase().includes(term),
         ),
       }))
       .filter((level) => level.users.length > 0);
@@ -82,7 +79,7 @@ export default function AffiliateNetwork() {
   const totalLevels = filteredLevels.length;
   const paginatedLevels = filteredLevels.slice(
     (pageLevel - 1) * itemsPerPageLevel,
-    pageLevel * itemsPerPageLevel
+    pageLevel * itemsPerPageLevel,
   );
 
   const handleViewLevel = (level: number) => {
@@ -104,21 +101,26 @@ export default function AffiliateNetwork() {
   const [searchTermUsers, setSearchTermUsers] = useState("");
 
   const filteredUsers = useMemo(() => {
-    if (!users?.data) return [];
+    // CAMBIO 1: Validamos 'users' directamente, no 'users.data'
+    if (!users) return [];
+
+    // OJO: Si por casualidad viene en 'users.data', usamos ese, si no, usamos 'users' tal cual.
+    // Esto lo hace a prueba de balas.
+    const listaUsuarios = Array.isArray(users) ? users : users.data || [];
 
     const term = searchTermUsers.toLowerCase();
 
-    return users.data.filter(
+    // CAMBIO 2: Filtramos sobre la lista corregida
+    return listaUsuarios.filter(
       (u: any) =>
         u.username.toLowerCase().includes(term) ||
-        u.email.toLowerCase().includes(term)
+        u.email.toLowerCase().includes(term),
     );
   }, [users, searchTermUsers]);
-
   const totalUsers = filteredUsers.length;
   const paginatedUsers = filteredUsers.slice(
     (pageUsers - 1) * itemsPerPageUsers,
-    pageUsers * itemsPerPageUsers
+    pageUsers * itemsPerPageUsers,
   );
 
   // Estados de carga
@@ -143,61 +145,60 @@ export default function AffiliateNetwork() {
   }
 
   const renderLevelSection = (level: ReferralLevel) => {
-  const isExpanded = selectedLevel === level.level;
+    const isExpanded = selectedLevel === level.level;
 
-  return (
-    <div key={`level-${level.level}`} className="mb-6 border rounded-lg">
-      <button
-        onClick={() => handleViewLevel(level.level)}
-        className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors rounded-lg"
-      >
-        <h3 className="font-medium">Nivel {level.level}</h3>
+    return (
+      <div key={`level-${level.level}`} className="mb-6 border rounded-lg">
+        <button
+          onClick={() => handleViewLevel(level.level)}
+          className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors rounded-lg"
+        >
+          <h3 className="font-medium">Nivel {level.level}</h3>
 
-        <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
-          {level.users.length}
-        </span>
-      </button>
+          <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+            {level.users.length}
+          </span>
+        </button>
 
-      {isExpanded && (
-        <div className="mt-2 bg-white rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader className="bg-gradient-to-r from-green-900 to-green-500 text-white">
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {level.users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.username}</TableCell>
-
-                  <TableCell>
-                    <a
-                      href={`mailto:${u.email}`}
-                      className="text-blue-600 underline"
-                    >
-                      {u.email}
-                    </a>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
-                      Activo
-                    </span>
-                  </TableCell>
+        {isExpanded && (
+          <div className="mt-2 bg-white rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader className="bg-gradient-to-r from-green-900 to-green-500 text-white">
+                <TableRow>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </div>
-  );
-};
+              </TableHeader>
 
+              <TableBody>
+                {level.users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>{u.username}</TableCell>
+
+                    <TableCell>
+                      <a
+                        href={`mailto:${u.email}`}
+                        className="text-blue-600 underline"
+                      >
+                        {u.email}
+                      </a>
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+                        Activo
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Tabs defaultValue="levels" className="w-full space-y-6">
@@ -316,7 +317,9 @@ export default function AffiliateNetwork() {
                         </TableCell>
 
                         <TableCell>
-                          <Badge className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">Activo</Badge>
+                          <Badge className="px-3 py-1 bg-green-600 text-white text-xs rounded-full">
+                            Activo
+                          </Badge>
                         </TableCell>
 
                         <TableCell>
@@ -356,8 +359,7 @@ export default function AffiliateNetwork() {
                       size="sm"
                       variant="outline"
                       disabled={
-                        pageUsers ===
-                        Math.ceil(totalUsers / itemsPerPageUsers)
+                        pageUsers === Math.ceil(totalUsers / itemsPerPageUsers)
                       }
                       onClick={() => setPageUsers(pageUsers + 1)}
                     >

@@ -98,9 +98,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
         { icon: Users, label: "Mi Equipo", href: "/my-affiliates" },
         { icon: ShoppingCart, label: "Tienda", href: "/store" },
         { icon: Gift, label: "Catálogo de Regalos", href: "/gifts" },
-        // --- AQUÍ ESTÁ EL BOTÓN DE MIS PREMIOS ---
-        { icon: Gift, label: "Mis Premios", href: "/user/my-rewards" }, 
-        // -----------------------------------------
+        { icon: Gift, label: "Calificación de Rango", href: "/user/my-rewards" }, 
         { icon: CreditCard, label: "Mis Transacciones", href: "/transactions" },
         { icon: ArrowLeftRight, label: "Transferencias", href: "/transfers" },
         { icon: Settings, label: "Mi Perfil", href: "/profile" },
@@ -111,7 +109,7 @@ export default function AppLayout({ children }: Readonly<AppLayoutProps>) {
     { icon: Package, label: "Tienda Admin", href: "/admin/store" },
     { icon: BarChart3, label: "Reporte de Comisiones", href: "/admin/reports/commissions" },
     { icon: TrendingUp, label: "Configurar Comisiones", href: "/admin/commissions" },
-    { icon: Trophy, label: "Configurar Premios", href: "/admin/rewards-settings" }, 
+    { icon: Trophy, label: "Calificación De Rangos", href: "/admin/rewards-settings" }, 
     { icon: Settings, label: "Perfil de Admin", href: "/admin/profile" }
   ];
 

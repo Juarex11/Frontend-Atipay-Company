@@ -1,12 +1,37 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Smartphone, CreditCard, Banknote, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAuthHeaders } from '@/utils/auth';
 import { deleteUserPaymentMethod, updateUserPaymentMethod, type UpdateUserPaymentMethodDto } from '@/services/userPaymentMethodService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+
+// --- NUEVO: CONFIGURACIÓN DE DISEÑO DIFUMINADO ---
+const METHOD_THEMES: Record<string, { main: string, light: string, icon: any }> = {
+  'yape': { 
+    main: '#742284', 
+    light: 'rgba(116, 34, 132, 0.06)', 
+    icon: <Smartphone className="w-5 h-5" /> 
+  },
+  'plin': { 
+    main: '#00bfa5', 
+    light: 'rgba(0, 191, 165, 0.06)', 
+    icon: <Smartphone className="w-5 h-5" /> 
+  },
+  'transferencia bancaria': { 
+    main: '#004b98', 
+    light: 'rgba(0, 75, 152, 0.06)', 
+    icon: <CreditCard className="w-5 h-5" /> 
+  },
+  'bonificación': { 
+    main: '#f59e0b', 
+    light: 'rgba(245, 158, 11, 0.06)', 
+    icon: <Gift className="w-5 h-5" /> 
+  }
+};
 
 declare global {
   interface Window {
@@ -45,7 +70,6 @@ const EditPaymentMethodModal: React.FC<EditModalProps> = ({ isOpen, method, onCl
 
   useEffect(() => {
     if (method) {
-      // Convert all values to strings for the form
       const stringifiedData = Object.entries(method.data).reduce((acc, [key, value]) => {
         acc[key] = value !== null && value !== undefined ? String(value) : '';
         return acc;
@@ -56,22 +80,15 @@ const EditPaymentMethodModal: React.FC<EditModalProps> = ({ isOpen, method, onCl
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!method) return;
-
     try {
       setIsSaving(true);
-      await onSave(method.id, {
-        payment_method_id: method.payment_method_id,
-        data: formData
-      });
+      await onSave(method.id, { payment_method_id: method.payment_method_id, data: formData });
       onClose();
     } catch (error) {
       console.error('Error updating payment method:', error);
@@ -106,13 +123,7 @@ const EditPaymentMethodModal: React.FC<EditModalProps> = ({ isOpen, method, onCl
             </div>
           ))}
           <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSaving}
-              className="h-10 px-4 py-2"
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-10 px-4 py-2">
               Cancelar
             </Button>
             <Button type="submit" disabled={isSaving} className="h-10 px-4 py-2">
@@ -131,10 +142,17 @@ export default function UserPaymentMethods() {
   const [editingMethod, setEditingMethod] = useState<UserPaymentMethod | null>(null);
   const [methodToDelete, setMethodToDelete] = useState<number | null>(null);
 
+  // --- FUNCIÓN PARA OBTENER EL TEMA SEGÚN EL NOMBRE ---
+  const getTheme = (name: string) => {
+    const key = name?.toLowerCase() || '';
+    return METHOD_THEMES[key] || { main: '#6b7280', light: 'transparent', icon: <Banknote className="w-5 h-5" /> };
+  };
+
   const fetchPaymentMethods = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://127.0.0.1:8000/api/user/payment-methods', {
+      // CORRECCIÓN QUIRÚRGICA: https:// en lugar de httpss://
+      const response = await fetch('https://back.mibolsillo.site/api/user/payment-methods', {
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders()
@@ -155,24 +173,15 @@ export default function UserPaymentMethods() {
     }
   }, []);
 
-  // Fetch user payment methods on component mount
   useEffect(() => {
     fetchPaymentMethods();
-
-    // Expose refresh function to parent
     window.refreshPaymentMethods = fetchPaymentMethods;
-
-    return () => {
-      delete window.refreshPaymentMethods;
-    };
+    return () => { delete window.refreshPaymentMethods; };
   }, [fetchPaymentMethods]);
 
-  // Handle payment method deletion
   const handleDelete = async (id: number) => {
     try {
       await deleteUserPaymentMethod(id);
-
-      // Update the list after successful deletion
       setUserPaymentMethods(prev => prev.filter(method => method.id !== id));
       setMethodToDelete(null);
       toast.success('Método de pago eliminado correctamente');
@@ -182,7 +191,6 @@ export default function UserPaymentMethods() {
     }
   };
 
-  // Handle update payment method
   const handleUpdatePaymentMethod = async (id: number, data: Omit<UpdateUserPaymentMethodDto, 'id'>) => {
     try {
       const updatedMethod = await updateUserPaymentMethod(id, data);
@@ -192,65 +200,38 @@ export default function UserPaymentMethods() {
       toast.success('Método de pago actualizado correctamente');
     } catch (error) {
       console.error('Error updating payment method:', error);
-      throw error; // Re-throw to be handled by the modal
+      throw error;
     }
   };
 
-  // Format field values for display
   const formatFieldValue = (_field: string, value: string | number | boolean | null | undefined): string => {
     if (value === undefined || value === null || value === '') return '-';
     return String(value);
   };
 
-  // Format field labels for display
   const getFieldLabel = (field: string): string => {
     const labels: Record<string, string> = {
-      'numero': 'Número',
-      'numerocuenta': 'Número de Cuenta',
-      'cuenta': 'Número de Cuenta',
-      'titular': 'Titular',
-      'nombretitular': 'Titular',
-      'banco': 'Banco',
-      'bancodestino': 'Banco',
-      'cci': 'Número de CCI',
-      'numerocci': 'Número de CCI',
-      'telefono': 'Teléfono',
-      'celular': 'Teléfono',
-      'email': 'Correo Electrónico',
-      'correo': 'Correo Electrónico',
-      'nombres': 'Nombres Completos',
-      'apellidos': 'Apellidos',
-      'dni': 'DNI',
-      'ruc': 'RUC',
-      'direccion': 'Dirección',
-      'ciudad': 'Ciudad',
-      'pais': 'País',
-      'moneda': 'Moneda',
-      'tipocuenta': 'Tipo de Cuenta',
+      'numero': 'Número', 'numerocuenta': 'Número de Cuenta', 'cuenta': 'Número de Cuenta',
+      'titular': 'Titular', 'nombretitular': 'Titular', 'banco': 'Banco',
+      'bancodestino': 'Banco', 'cci': 'Número de CCI', 'numerocci': 'Número de CCI',
+      'telefono': 'Teléfono', 'celular': 'Teléfono', 'email': 'Correo Electrónico',
+      'correo': 'Correo Electrónico', 'nombres': 'Nombres Completos', 'apellidos': 'Apellidos',
+      'dni': 'DNI', 'ruc': 'RUC', 'direccion': 'Dirección', 'ciudad': 'Ciudad',
+      'pais': 'País', 'moneda': 'Moneda', 'tipocuenta': 'Tipo de Cuenta',
     };
-
-    // Check for case-insensitive match
     const lowerField = field.toLowerCase();
     const matchedKey = Object.keys(labels).find(key => key.toLowerCase() === lowerField);
-
-    if (matchedKey) {
-      return labels[matchedKey];
-    }
-
-    // Format the field name if no match found
-    return field
-      .split(/(?=[A-Z])/)
-      .join(' ')
-      .replace(/^./, str => str.toUpperCase());
+    if (matchedKey) return labels[matchedKey];
+    return field.split(/(?=[A-Z])/).join(' ').replace(/^./, str => str.toUpperCase());
   };
 
-  // Render method details in a clean format
   const renderMethodDetails = (method: UserPaymentMethod) => {
+    const theme = getTheme(method.method?.name);
     return (
-      <div className="space-y-2">
+      <div className="space-y-1 border-l-2 pl-3" style={{ borderColor: theme.main }}>
         {Object.entries(method.data).map(([key, value]) => (
           <div key={key} className="text-sm">
-            <span className="font-medium text-gray-900">
+            <span className="font-semibold" style={{ color: theme.main }}>
               {getFieldLabel(key)}:
             </span>{' '}
             <span className="text-gray-600">
@@ -276,7 +257,7 @@ export default function UserPaymentMethods() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative space-y-4">
       <EditPaymentMethodModal
         isOpen={!!editingMethod}
         method={editingMethod}
@@ -292,69 +273,69 @@ export default function UserPaymentMethods() {
         confirmText="Eliminar"
         confirmColor="bg-red-600 hover:bg-red-700"
       />
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Mis métodos de pago</CardTitle>
+      <Card className="w-full border-none shadow-lg overflow-hidden">
+        <CardHeader className="bg-white border-b border-gray-50">
+          <CardTitle className="text-xl font-bold text-gray-800">Mis métodos de pago</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {userPaymentMethods.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-12 text-gray-500 font-medium">
               No hay métodos de pago registrados
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-100">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Método
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Detalles
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Método</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalles</th>
+                    <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {userPaymentMethods.map((method) => (
-                    <tr key={method.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {method.method?.name || 'Método desconocido'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {renderMethodDetails(method)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex gap-2">
-                          
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditingMethod(method)}
-                            className="text-blue-500 hover:text-blue-700"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-500 hover:text-red-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMethodToDelete(method.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="bg-white divide-y divide-gray-50">
+                  {userPaymentMethods.map((method) => {
+                    const theme = getTheme(method.method?.name);
+                    return (
+                      <tr 
+                        key={method.id} 
+                        className="transition-colors duration-200"
+                        style={{ backgroundColor: theme.light }} // FONDO DIFUMINADO
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm"
+                              style={{ backgroundColor: theme.main }}
+                            >
+                              {theme.icon}
+                            </div>
+                            <span className="font-bold text-gray-900">{method.method?.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {renderMethodDetails(method)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost" size="icon"
+                              onClick={() => setEditingMethod(method)}
+                              className="text-blue-500 hover:bg-white/50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon"
+                              className="text-red-500 hover:bg-white/50"
+                              onClick={() => setMethodToDelete(method.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

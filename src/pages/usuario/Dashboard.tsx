@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Target,
   CheckCircle2,
+  Star,
 } from "lucide-react";
 import { AtipayCoin } from "@/components/ui/AtipayCoin";
 import { getTransferHistory } from "@/services/walletService";
@@ -52,7 +53,8 @@ interface DashboardData {
   balance: number;
   totalEarnings: number;
   activeInvestments: number;
-  points: number;
+  points: number; // Estos serán los puntos DEL MES (calificación)
+  total_points: number; // Estos serán los puntos TOTALES (regalos)
 
   points_history?: Array<{ name: string; puntos: number }>;
   recentTransactions: Array<{
@@ -81,8 +83,10 @@ export default function Dashboard() {
   const [showCoin, setShowCoin] = useState(true);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false); 
   const [error, setError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    
 
   // 2. ESTADOS PARA EL PREMIO
   const [showCelebration, setShowCelebration] = useState(false);
@@ -102,9 +106,12 @@ export default function Dashboard() {
     totalEarnings: 0,
     activeInvestments: 0,
     points: 0,
+    total_points: 0, // Inicializar
     recentTransactions: [],
     investments: [],
   });
+
+  const [showTotalPoints, setShowTotalPoints] = useState(false);
   const [targetPoints, setTargetPoints] = useState(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [chartHistory, setChartHistory] = useState<
@@ -123,7 +130,7 @@ export default function Dashboard() {
               Accept: "application/json",
               Authorization: `Bearer ${token}`,
             },
-          }
+          },
         );
 
         if (response.ok) {
@@ -164,11 +171,11 @@ export default function Dashboard() {
           const result = await response.json();
           if (result.has_achievement) {
             const data = result.data; // Aquí ya sacaste los datos de 'result'
-            
+
             setCurrentAchievement({
               id: Date.now(),
-              key: data.key,       
-              title: data.title,   
+              key: data.key,
+              title: data.title,
               rewardName: data.rewardName,
               message: data.message,
               imageUrl: data.imageUrl,
@@ -206,9 +213,15 @@ export default function Dashboard() {
     }
   };
 
-  const fetchDashboardData = useCallback(async () => {
+ const fetchDashboardData = useCallback(async () => {
     try {
-      setIsLoading(true);
+      // Si no hay usuario (primera carga), bloqueamos pantalla.
+      // Si YA hay usuario (botón actualizar), activamos el spinner del botón.
+      if (!user) {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true); // <--- AGREGA ESTO
+      }
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}/user`, {
         headers: {
@@ -216,6 +229,8 @@ export default function Dashboard() {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      
 
       if (!response.ok) {
         throw new Error("Error al cargar los datos del usuario");
@@ -258,7 +273,7 @@ export default function Dashboard() {
 
       const totalEarnings = investments.reduce(
         (sum, inv) => sum + (inv.total_earning || 0),
-        0
+        0,
       );
 
       try {
@@ -280,7 +295,9 @@ export default function Dashboard() {
         balance: walletBalance.balance,
         activeInvestments: investments.length,
         totalEarnings,
-        points: userData.accumulated_points || 0,
+        // MODIFICACIÓN AQUÍ:
+        points: userData.monthly_points || 0, // Puntos que se resetean cada 1 de mes
+        total_points: userData.accumulated_points || 0, // Puntos que nunca se borran (regalos)
         points_history: userData.points_history || [],
         recentTransactions: transactions,
         investments: investments.map((inv) => ({
@@ -297,12 +314,13 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError(
-        "No se pudo cargar la información del dashboard. Por favor, intenta de nuevo más tarde."
+        "No se pudo cargar la información del dashboard. Por favor, intenta de nuevo más tarde.",
       );
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false); // <--- AGREGA ESTO
     }
-  }, []);
+  }, [user]); // Asegúrate de que 'user' esté aquí en las dependencias
 
   useEffect(() => {
     if (user?.role === "admin") {
@@ -364,6 +382,17 @@ export default function Dashboard() {
   const chartDataToDisplay =
     chartHistory.length > 0 ? chartHistory : initialData;
 
+  const totalYearPoints = chartDataToDisplay.reduce(
+    (sum, item) => sum + (item.points || 0),
+    0,
+  );
+
+  // Esto permite que si hoy es 14/02, lea febrero, pero si haces tu prueba
+  // cambiando la fecha de tu PC a marzo, el Dashboard leerá marzo automáticamente.
+  const currentMonthIndex = new Date().getMonth();
+  const pointsToDisplayInCards =
+    chartDataToDisplay[currentMonthIndex]?.points || 0;
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
@@ -381,9 +410,14 @@ export default function Dashboard() {
               })}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isRefreshing} // Deshabilita si está cargando
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando..." : "Actualizar"}
           </Button>
         </div>
         {error && (
@@ -421,7 +455,7 @@ export default function Dashboard() {
                           {transaction.created_at &&
                           !isNaN(new Date(transaction.created_at).getTime())
                             ? new Date(
-                                transaction.created_at
+                                transaction.created_at,
                               ).toLocaleDateString()
                             : "Fecha no disponible"}
                         </p>
@@ -430,7 +464,7 @@ export default function Dashboard() {
                         className={`font-medium ${transaction.type === "deposit" ? "text-green-600" : "text-red-600"}`}
                       >
                         {transaction.type === "deposit" ? "+" : "-"}S/{" "}
-                        {transaction.amount.toFixed(2)}
+                        {Number(transaction.amount).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -476,7 +510,7 @@ export default function Dashboard() {
                     +
                     {
                       dashboardData.recentTransactions.filter(
-                        (t) => t.type === "credit"
+                        (t) => t.type === "credit",
                       ).length
                     }{" "}
                     operaciones
@@ -507,24 +541,42 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-teal-700 to-teal-900 text-white border-0">
+            <Card className="bg-gradient-to-br from-teal-800 to-teal-950 text-white border-0 shadow-lg transition-all duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/90">
-                  Puntos de Acumulados
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-white/70">
+                  {showTotalPoints
+                    ? "Puntos para Regalos"
+                    : "Calificación del Mes"}
                 </CardTitle>
-                <div className="flex items-center space-x-2">
-                  <AtipayCoin size="sm" className="text-white" />
-                </div>
+                {/* BOTÓN PARA CAMBIAR VISTA */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-[10px] text-white bg-white/10 hover:bg-white/20 border border-white/20"
+                  onClick={() => setShowTotalPoints(!showTotalPoints)}
+                >
+                  <RefreshCw
+                    className={`h-3 w-3 mr-1 ${showTotalPoints ? "rotate-180" : ""} transition-transform`}
+                  />
+                  {showTotalPoints ? "Ver Mes" : "Ver Totales"}
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white">
-                  <div className="flex items-center gap-1">
-                    <AtipayCoin size="xs" className="w-4 h-4 text-white" />
-                    <span>{dashboardData.points.toLocaleString()}</span>
-                  </div>
+                <div className="text-3xl font-black text-white flex items-center gap-2">
+                  <Star
+                    className={`w-6 h-6 ${showTotalPoints ? "text-yellow-400 fill-yellow-400" : "text-orange-400 fill-orange-400"}`}
+                  />
+                  <span>
+                    {showTotalPoints
+                      ? Math.floor(dashboardData.total_points).toString()
+                      : Math.floor(pointsToDisplayInCards).toString()}
+                    {/* ✅ Ahora usa pointsToDisplayInCards */}
+                  </span>
                 </div>
-                <p className="text-xs text-white/80">
-                  Acumulados por tus transacciones
+                <p className="text-[11px] text-white/60 mt-2 italic">
+                  {showTotalPoints
+                    ? "Acumulado histórico para canjear premios."
+                    : "Se reinicia a 0 el día 1 de cada mes."}
                 </p>
               </CardContent>
             </Card>
@@ -583,26 +635,31 @@ export default function Dashboard() {
                 </div>
 
                 <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
-                      {dashboardData.points.toLocaleString()}
-                    </span>
-                    <span className="text-sm font-medium text-gray-500">
-                      pts actuales
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <Star
+                      className={`w-9 h-9 ${pointsToDisplayInCards >= 100 ? "text-green-500 fill-green-500" : "text-orange-500 fill-orange-500"}`}
+                    />
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
+                        {Math.floor(pointsToDisplayInCards).toString()}
+                      </span>
+                      <span className="text-sm font-medium text-gray-500">
+                        pts este mes
+                      </span>
+                    </div>
                   </div>
 
-                  {dashboardData.points < targetPoints ? (
+                  {/* Lógica de calificación sincronizada */}
+                  {pointsToDisplayInCards < 100 ? (
                     <p className="text-sm text-amber-600 font-medium mt-1 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
-                      Te faltan {targetPoints - dashboardData.points} pts para
-                      calificar
+                      Te faltan {100 - Math.floor(pointsToDisplayInCards)} pts
+                      para estar Activo
                     </p>
                   ) : (
                     <p className="text-sm text-green-600 font-medium mt-1 flex items-center gap-1">
                       <Trophy className="w-3 h-3" />
-                      ¡Has superado la meta por{" "}
-                      {dashboardData.points - targetPoints} pts!
+                      ¡Felicidades! Estás Activo este mes
                     </p>
                   )}
                 </div>
@@ -612,8 +669,8 @@ export default function Dashboard() {
                     <span>Progreso</span>
                     <span>
                       {Math.min(
-                        (dashboardData.points / (targetPoints || 1)) * 100,
-                        100
+                        (pointsToDisplayInCards / (targetPoints || 1)) * 100,
+                        100,
                       ).toFixed(0)}
                       %
                     </span>
@@ -621,12 +678,12 @@ export default function Dashboard() {
                   <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden shadow-inner">
                     <div
                       className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        dashboardData.points >= targetPoints
+                        pointsToDisplayInCards >= targetPoints
                           ? "bg-gradient-to-r from-green-500 to-emerald-600"
                           : "bg-gradient-to-r from-amber-400 to-orange-500"
                       }`}
                       style={{
-                        width: `${Math.min((dashboardData.points / (targetPoints || 1)) * 100, 100)}%`,
+                        width: `${Math.min((pointsToDisplayInCards / (targetPoints || 1)) * 100, 100)}%`,
                       }}
                     ></div>
                   </div>
@@ -669,7 +726,7 @@ export default function Dashboard() {
                     Historial de Rendimiento
                   </h3>
                   <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    Total Año: {dashboardData.points} pts
+                    Total Año {selectedYear}: {totalYearPoints.toString()} pts
                   </span>
                 </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Gift as GiftIcon, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Gift as GiftIcon, Clock, CheckCircle, XCircle, Star } from 'lucide-react'; // Agregamos Star
 import { toast } from 'sonner';
 import { giftService } from '../../services/giftService';
 import { GiftDetailsModal } from './GiftDetailsModal';
@@ -28,6 +28,9 @@ const UserGiftCatalog = () => {
   const [claimingRequestId, setClaimingRequestId] = useState<number | null>(null);
   const [rewardRequests, setRewardRequests] = useState<RewardRequest[]>([]);
   const [activeTab, setActiveTab] = useState<'catalog' | 'history'>('catalog');
+  
+  // 1. Estado para almacenar los puntos acumulados de forma local
+  const [accumulatedPoints, setAccumulatedPoints] = useState<number>(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -44,11 +47,30 @@ const UserGiftCatalog = () => {
       }
     };
 
+    // 2. Función para obtener los puntos reales del usuario desde el backend
+    const fetchUserPoints = async () => {
+      try {
+        const response = await fetch('https://back.mibolsillo.site/api/user', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Accept': 'application/json',
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAccumulatedPoints(data.accumulated_points || 0);
+        }
+      } catch (error) {
+        console.error('Error al obtener puntos:', error);
+      }
+    };
+
     const fetchData = async () => {
       try {
         await Promise.all([
           fetchGifts(),
-          fetchRewardRequests()
+          fetchRewardRequests(),
+          fetchUserPoints() // Cargamos los puntos al iniciar
         ]);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -60,7 +82,7 @@ const UserGiftCatalog = () => {
 
   const fetchRewardRequests = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/rewards/my-requests', {
+      const response = await fetch('https://back.mibolsillo.site/api/rewards/my-requests', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Accept': 'application/json',
@@ -99,7 +121,7 @@ const UserGiftCatalog = () => {
     setIsRedeeming(true);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/rewards/${gift.id}/request`, {
+      const response = await fetch(`https://back.mibolsillo.site/api/rewards/${gift.id}/request`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -135,7 +157,7 @@ const UserGiftCatalog = () => {
     setClaimingRequestId(requestId);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/reward-requests/${requestId}/claim`, {
+      const response = await fetch(`https://back.mibolsillo.site/api/reward-requests/${requestId}/claim`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -223,27 +245,37 @@ const UserGiftCatalog = () => {
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Catálogo de Recompensas</h1>
         <p className="text-gray-500 text-sm mb-4">Canjea tus puntos por increíbles premios</p>
 
-        <div className="inline-flex rounded-md shadow-sm mb-2" role="group">
-          <button
-            type="button"
-            onClick={() => setActiveTab('catalog')}
-            className={`px-4 py-2 text-sm font-medium rounded-l-lg ${activeTab === 'catalog'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-          >
-            Catálogo
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 text-sm font-medium rounded-r-lg ${activeTab === 'history'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-          >
-            Mis Solicitudes
-          </button>
+        <div className="flex flex-col items-center gap-4">
+          <div className="inline-flex rounded-md shadow-sm" role="group">
+            <button
+              type="button"
+              onClick={() => setActiveTab('catalog')}
+              className={`px-4 py-2 text-sm font-medium rounded-l-lg ${activeTab === 'catalog'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              Catálogo
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`px-4 py-2 text-sm font-medium rounded-r-lg ${activeTab === 'history'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+            >
+              Mis Solicitudes
+            </button>
+          </div>
+
+          {/* 3. Indicador de puntos sutil pero visible */}
+          <div className="flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100 shadow-sm">
+            <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+            <span className="text-xs font-bold text-orange-700">
+              Saldo: {Math.floor(accumulatedPoints).toLocaleString()} pts
+            </span>
+          </div>
         </div>
       </div>
 
@@ -306,7 +338,6 @@ const UserGiftCatalog = () => {
                         const redemptionInfo = gift.redemption_info;
                         const request = getRequestStatus(Number(gift.id));
 
-                        // si la solicitud es aprobada, que aparezca el boton de reclamar
                         if (request && request.status === 'approved') {
                           return (
                             <div className="text-center">
@@ -337,7 +368,6 @@ const UserGiftCatalog = () => {
                           );
                         }
 
-                        // si la solicitud está pendiente
                         if (request && request.status === 'pending') {
                           return (
                             <div className="text-center">
@@ -353,7 +383,6 @@ const UserGiftCatalog = () => {
                           );
                         }
 
-                        // si llegó al limite de canjes
                         if (redemptionInfo?.has_reached_limit) {
                           return (
                             <div className="text-center">

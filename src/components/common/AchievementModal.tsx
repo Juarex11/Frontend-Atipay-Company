@@ -12,10 +12,10 @@ import { API_BASE_URL } from '@/config';
 const fixImageUrl = (url?: string | null) => {
   if (!url) return undefined;
   
-  const lastHttpIndex = url.lastIndexOf("http");
-  if (lastHttpIndex > 0) return url.substring(lastHttpIndex);
+  const lasthttpsIndex = url.lastIndexOf("https");
+  if (lasthttpsIndex > 0) return url.substring(lasthttpsIndex);
   
-  if (url.startsWith("http")) return url;
+  if (url.startsWith("https")) return url;
   
   const baseUrl = API_BASE_URL.replace(/\/api\/?$/, '');
   const cleanPath = url.startsWith('/') ? url : `/${url}`;

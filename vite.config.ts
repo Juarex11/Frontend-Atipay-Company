@@ -26,9 +26,12 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: mode === 'development',
-      // 1. Aumentamos el límite de advertencia a 1MB (1000 kB)
-      chunkSizeWarningLimit: 1000,
-      // 2. Configuración para dividir el código (Code Splitting)
+      // 1. Aumentamos el límite de advertencia a 1600kB por si acaso
+      chunkSizeWarningLimit: 1600,
+      
+      // --- SECCIÓN COMENTADA PARA EVITAR EL ERROR DE PANTALLA BLANCA ---
+      // Al comentar esto, dejamos que Vite decida el mejor orden para cargar React
+      /*
       rollupOptions: {
         output: {
           manualChunks: (id) => {
@@ -56,6 +59,8 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+      */
+      // ------------------------------------------------------------------
     },
   }
 })

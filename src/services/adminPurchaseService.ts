@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const API_URL = 'http://127.0.0.1:8000/api'; 
+const API_URL = 'https://back.mibolsillo.site/api'; 
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -33,6 +33,8 @@ export interface ManualPurchaseData {
     points?: number;
     payment_method?: 'cash' | 'wallet';
     image?: File | null; 
+    product_id?: number | string | null; 
+    date?: string; 
 }
 
 // --- INTERFAZ ACTUALIZADA ---
@@ -99,13 +101,21 @@ export const storeManualPurchase = async (data: ManualPurchaseData) => {
     formData.append('user_id', data.user_id.toString());
     formData.append('amount', data.amount.toString());
     formData.append('description', data.description);
+
+    if (data.product_id) formData.append('product_id', data.product_id.toString());
     if (data.points !== undefined) formData.append('points', data.points.toString());
     if (data.payment_method) formData.append('payment_method', data.payment_method);
     if (data.image) formData.append('image', data.image);
 
+    // ✅ AGREGAMOS ESTA LÍNEA PARA ENVIAR LA FECHA AL SERVIDOR
+    if (data.date) formData.append('date', data.date);
+
     const response = await fetch(`${API_URL}/admin/manual-purchase`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Accept': 'application/json' },
+        headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('token')}`, 
+            'Accept': 'application/json' 
+        },
         body: formData,
     });
     

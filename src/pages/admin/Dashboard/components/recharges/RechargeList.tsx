@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,6 @@ import {
   rejectRecharge,
   type Recharge,
 } from "@/services/atipayRechargeService";
-import { getUserPaymentMethods, type UserPaymentMethod } from "@/services/userPaymentMethodService";
 import { toast } from "sonner";
 import { DetailsModal } from "./components/DetailsModal";
 import { DeleteModal } from "./components/DeleteModal";
@@ -38,7 +37,7 @@ const statusLabels: Record<string, string> = {
   rejected: "Rechazado",
 };
 
-// Estilos de colores para los métodos de pago
+// Estilos de colores para todos los métodos de pago (Intactos)
 const paymentMethodStyles: Record<string, string> = {
   "Yape": "bg-purple-100 text-purple-800 border-purple-200",
   "Plin": "bg-blue-100 text-blue-800 border-blue-200",
@@ -58,31 +57,27 @@ const getPaymentMethodStyles = (methodName: string) => {
   return paymentMethodStyles[methodName] || "bg-gray-100 text-gray-800 border-gray-200";
 };
 
+// SOLUCIÓN: Traductor directo de IDs a Nombres con TODOS los métodos
+const getPaymentMethodName = (methodId: string | number) => {
+  const id = String(methodId);
+  switch (id) {
+    case "1": return "Yape";
+    case "2": return "BCP"; // Ajusta este ID si BCP tiene otro número en tu BD
+    case "3": return "Plin";
+    case "4": return "Transferencia Bancaria";
+    case "5": return "Interbank"; // Ajusta este ID si Interbank tiene otro número
+    case "6": return "BBVA"; // Ajusta este ID si BBVA tiene otro número
+    case "7": return "Scotiabank"; // Ajusta este ID si Scotiabank tiene otro número
+    case "8": return "Tunki"; // Ajusta este ID si Tunki tiene otro número
+    case "9": return "Otro"; // Ajusta este ID si Otro tiene otro número
+    default: return `Método ${id}`;
+  }
+};
+
 export const RechargeList = ({ recharges, onReload }: RechargeListProps) => {
   const [detail, setDetail] = useState<Recharge | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Recharge | null>(null);
-  const [userPaymentMethods, setUserPaymentMethods] = useState<UserPaymentMethod[]>([]);
-
-  // Cargar métodos de pago del usuario para poder mostrar los nombres
-  useEffect(() => {
-    const loadUserPaymentMethods = async () => {
-      try {
-        const methods = await getUserPaymentMethods();
-        setUserPaymentMethods(methods);
-      } catch (error) {
-        console.error('Error loading user payment methods:', error);
-      }
-    };
-
-    loadUserPaymentMethods();
-  }, []);
-
-  // Función para obtener el nombre del método de pago
-  const getPaymentMethodName = (userPaymentMethodId: string) => {
-    const method = userPaymentMethods.find(m => m.id.toString() === userPaymentMethodId);
-    return method?.method?.name || `Método ${userPaymentMethodId}`;
-  };
 
   const handleApprove = async (id: number) => {
     setLoadingId(id);

@@ -3,7 +3,7 @@
 ## Componentes Creados
 
 ### 1. **DepositService** (`src/services/depositService.ts`)
-Servicio que maneja todas las peticiones HTTP al backend para depósitos.
+Servicio que maneja todas las peticiones https al backend para depósitos.
 
 **Métodos disponibles:**
 - `createDepositRequest(productId, quantity)` - Crea nueva solicitud

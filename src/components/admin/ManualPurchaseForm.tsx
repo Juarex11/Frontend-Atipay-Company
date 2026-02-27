@@ -81,6 +81,11 @@ export const ManualPurchaseForm = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Nueva línea para la fecha:
+  const [saleDate, setSaleDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+
   // --- CÁLCULOS ---
   const totalMoney = cart.reduce((acc, item) => acc + (item.price || 0), 0);
   const totalPoints = cart.reduce((acc, item) => acc + (item.points || 0), 0);
@@ -96,7 +101,7 @@ export const ManualPurchaseForm = () => {
 
       setPacks(Array.isArray(packsData) ? packsData : []);
       setProducts(
-        Array.isArray(productsData) ? productsData : productsData.data || []
+        Array.isArray(productsData) ? productsData : productsData.data || [],
       );
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -156,11 +161,11 @@ export const ManualPurchaseForm = () => {
           if (item.type === "product") return deleteProduct(item.id);
           if (item.type === "pack") return deletePack(item.id);
           return Promise.resolve();
-        })
+        }),
       );
 
       setSuccessMsg(
-        `${selectedToDelete.length} elementos eliminados correctamente.`
+        `${selectedToDelete.length} elementos eliminados correctamente.`,
       );
       setSelectedToDelete([]);
       setIsDeleteMode(false);
@@ -311,14 +316,19 @@ export const ManualPurchaseForm = () => {
   const handleFinalProcessSale = async () => {
     setLoading(true);
     const itemNames = cart.map((item) => item.name).join(", ");
+    // Si es un pack, podrías decidir enviar null o el ID del primer ítem
+    const firstProductId = cart.length > 0 ? cart[0].productId || null : null;
+
     try {
       const response = await storeManualPurchase({
         user_id: parseInt(selectedUser),
+        product_id: firstProductId,
         amount: totalMoney,
         description: itemNames,
         points: totalPoints,
         payment_method: paymentMethod,
         image: selectedImage,
+        date: saleDate, // <--- Enviamos la fecha seleccionada
       });
 
       const purchaseId = response.purchase
@@ -334,7 +344,8 @@ export const ManualPurchaseForm = () => {
         amount: totalMoney,
         points: totalPoints,
         payment_method: paymentMethod,
-        date: new Date().toLocaleDateString("es-ES"),
+        // Usamos saleDate para que el historial local coincida con la base de datos
+        date: new Date(saleDate + "T12:00:00").toLocaleDateString("es-ES"),
         time: new Date().toLocaleTimeString("es-ES", {
           hour: "2-digit",
           minute: "2-digit",
@@ -434,6 +445,19 @@ export const ManualPurchaseForm = () => {
           />
         </div>
         <div className="xl:col-span-5 space-y-6 sticky top-6">
+          {/* Nuevo Selector de Fecha */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">
+              Fecha de Operación
+            </label>
+            <input
+              type="date"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 outline-none text-gray-700 font-medium"
+            />
+          </div>
+
           <CartPanel
             users={users}
             selectedUser={selectedUser}
@@ -767,13 +791,13 @@ export const ManualPurchaseForm = () => {
           // ✅ Lógica para el mensaje de tu jefe
           if (response?.action === "deleted") {
             setErrorMsg(
-              "El pack se eliminó automáticamente al quedarse sin productos."
+              "El pack se eliminó automáticamente al quedarse sin productos.",
             );
           } else {
             setSuccessMsg(
               editingPack
                 ? "Pack actualizado y totales recalculados"
-                : "Pack creado exitosamente 🎉"
+                : "Pack creado exitosamente 🎉",
             );
           }
 

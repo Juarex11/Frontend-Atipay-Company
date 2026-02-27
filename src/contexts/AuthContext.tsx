@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   createContext,
   useState,
@@ -200,11 +201,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         window.location.href = role === 'admin' ? '/admin/dashboard' : '/dashboard';
       }, 100);
 
-    } catch (error) {
-      console.error('[AuthContext] Login error:', error);
-      clearAuthData();
-      throw error instanceof Error ? error : new Error('Unknown login error');
-    } finally {
+    } catch (error: any) {
+  // Esto te dirá exactamente qué texto envió el servidor (ej: "Credenciales inválidas")
+  console.error('[AuthContext] Detalle del error:', error.message);
+  clearAuthData();
+  throw error;
+} finally {
       setIsLoading(false);
     }
   }, [clearAuthData, parseTokenPayload]);

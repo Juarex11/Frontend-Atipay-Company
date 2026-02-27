@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Edit, Loader2, Trophy } from 'lucide-react'; // Agregué Trophy para el icono
+import { Plus, Trash2, Edit, Loader2, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getCommissionSettings,
@@ -14,7 +15,6 @@ import CommissionModal from '@/components/admin/CommissionModal';
 import ConfirmationModal from '@/components/admin/ConfirmationModal';
 import { MinPointsEditor } from '../../components/admin/settings/MinPointsEditor';
 
-
 interface CommissionSettingsContentProps {
   isLoading: boolean;
   settings: CommissionSetting[];
@@ -24,10 +24,12 @@ interface CommissionSettingsContentProps {
 
 const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
   isLoading,
-  settings,
+  settings, 
   onEditSetting,
   onDeleteSetting
 }) => {
+  const safeSettings = Array.isArray(settings) ? settings : [];
+
   const formatPercentage = (value: number) => {
     return value ? Math.round(Number(value)).toString() : '0';
   };
@@ -45,10 +47,9 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
     );
   }
 
-  if (settings.length === 0) {
+  if (safeSettings.length === 0) {
     return (
       <div className="p-12 text-center">
-        {/* ... (Icono SVG existente) ... */}
         <h3 className="text-lg font-medium text-gray-900 mb-1">Sin configuraciones</h3>
         <p className="text-gray-500">
           No hay configuraciones de comisión. Agrega un nivel para comenzar.
@@ -70,7 +71,6 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Porcentaje
                 </TableHead>
-                {/* --- NUEVA COLUMNA: PUNTOS MÍNIMOS --- */}
                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Puntos Mínimos
                 </TableHead>
@@ -80,7 +80,7 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody className="bg-white divide-y divide-gray-200">
-              {settings.map((setting) => (
+              {safeSettings.map((setting) => (
                 <TableRow key={setting.level} className="hover:bg-gray-50">
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                     Nivel {getLevel(setting.level)}
@@ -88,12 +88,10 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
                     {formatPercentage(setting.percentage)}%
                   </TableCell>
-                  {/* --- NUEVA CELDA: PUNTOS --- */}
                   <TableCell className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                     <div className="flex items-center gap-2">
-                       <Trophy className="w-4 h-4 text-yellow-500" />
-                       {/* Si min_points no existe (porque no está en BD), mostramos 0 */}
-                       <span className="font-mono">{(setting as unknown).min_points || 0} pts</span>
+                        <Trophy className="w-4 h-4 text-yellow-500" />
+                        <span className="font-mono">{setting.min_points || 0} pts</span>
                     </div>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">
@@ -127,13 +125,11 @@ const CommissionSettingsContent: React.FC<CommissionSettingsContentProps> = ({
 };
 
 export default function CommissionsSettings() {
-  // ... (Hooks y estados existentes se mantienen igual) ...
   const { user } = useAuth();
   const [settings, setSettings] = useState<CommissionSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Modificamos el tipo aquí para incluir min_points opcionalmente
   const [editingSetting, setEditingSetting] = useState<any | null>(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,7 +137,6 @@ export default function CommissionsSettings() {
   const [levelToDelete, setLevelToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ... (useEffect loadSettings se mantiene igual) ...
   useEffect(() => {
     if (user?.role !== 'admin') return;
 
@@ -149,10 +144,20 @@ export default function CommissionsSettings() {
       try {
         setIsLoading(true);
         const data = await getCommissionSettings();
-        setSettings(data);
+        
+        // Lógica para detectar la propiedad 'levels'
+        if (data && (data as any).levels && Array.isArray((data as any).levels)) {
+            setSettings((data as any).levels);
+        } else if (data && (data as any).data && Array.isArray((data as any).data)) {
+            setSettings((data as any).data);
+        } else {
+            setSettings(Array.isArray(data) ? data : []);
+        }
+
       } catch (error) {
         console.error('Error al cargar configuraciones de comisión:', error);
         toast.error('Error al cargar las configuraciones de comisión');
+        setSettings([]); 
       } finally {
         setIsLoading(false);
       }
@@ -161,12 +166,9 @@ export default function CommissionsSettings() {
     loadSettings();
   }, [user]);
 
-
-  // ... (handleSaveSetting se mantiene igual, el backend recibirá el campo extra) ...
   const handleSaveSetting = async (setting: any): Promise<void> => {
     try {
       setIsSubmitting(true);
-      // Aquí enviaremos 'min_points' aunque la interfaz original no lo tenga definido aun
       await createCommissionSetting(setting); 
       
       if (editingSetting) {
@@ -176,7 +178,17 @@ export default function CommissionsSettings() {
       }
       
       const updatedSettings = await getCommissionSettings();
-      setSettings(updatedSettings);
+      
+      // Misma lógica para detectar 'levels' al actualizar
+      if (updatedSettings && (updatedSettings as any).levels && Array.isArray((updatedSettings as any).levels)) {
+          setSettings((updatedSettings as any).levels);
+      } else if (updatedSettings && (updatedSettings as any).data && Array.isArray((updatedSettings as any).data)) {
+          setSettings((updatedSettings as any).data);
+      } else {
+          setSettings(Array.isArray(updatedSettings) ? updatedSettings : []);
+      }
+
+      setIsModalOpen(false); 
     } catch (error) {
       console.error('Error al guardar configuración:', error);
       toast.error('Error al guardar la configuración');
@@ -185,7 +197,6 @@ export default function CommissionsSettings() {
     }
   };
 
-  // ... (handleDeleteClick, handleConfirmDelete, handleCancelDelete se mantienen igual) ...
   const handleDeleteClick = (level: number) => {
      setLevelToDelete(level);
      setDeleteModalOpen(true);
@@ -196,16 +207,14 @@ export default function CommissionsSettings() {
     try {
       setIsDeleting(true);
       await deleteCommissionSetting(levelToDelete);
+      
       setSettings(prevSettings => prevSettings.filter(s => s.level !== levelToDelete));
       toast.success('Nivel de comisión eliminado exitosamente');
       setDeleteModalOpen(false);
-      const updatedSettings = await getCommissionSettings();
-      setSettings(updatedSettings);
+      
     } catch (error) {
       console.error('Error al eliminar configuración:', error);
       toast.error('Error al eliminar el nivel de comisión');
-      const updatedSettings = await getCommissionSettings();
-      setSettings(updatedSettings);
     } finally {
       setIsDeleting(false);
       setLevelToDelete(null);
@@ -217,32 +226,30 @@ export default function CommissionsSettings() {
     setLevelToDelete(null);
   };
 
-
-  // --- MODIFICACIÓN AQUÍ: Pasamos los puntos al editar ---
   const handleEditSetting = (setting: CommissionSetting) => {
     setEditingSetting({
       level: setting.level,
       percentage: setting.percentage,
-      min_points: (setting as any).min_points || 0 // Aseguramos que pase el valor
+      min_points: (setting as any).min_points || 0
     });
     setIsModalOpen(true);
   };
 
-  // --- MODIFICACIÓN AQUÍ: Inicializamos puntos en 0 al crear ---
   const handleAddNew = () => {
-    setEditingSetting({ min_points: 0 }); // Inicializamos vacío pero con la propiedad
+    setEditingSetting({ 
+      level: '',
+      percentage: '',
+      min_points: 0 
+    }); 
     setIsModalOpen(true);
   };
 
   if (user?.role !== 'admin') {
-    // ... (Vista de acceso restringido se mantiene igual) ...
     return <div>Acceso restringido</div>; 
   }
 
   return (
-    <div className="p-6 space-y-8"> {/* Aumentamos espacio vertical para que no se vea apretado */}
-      
-      {/* 1. ENCABEZADO (Igual al que tenías) */}
+    <div className="p-6 space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-[#0c4a2a] to-[#0a7e3e] p-6 rounded-lg text-white shadow-md">
         <div>
           <h1 className="text-2xl font-bold mb-1">Configuración de Comisiones</h1>
@@ -252,8 +259,6 @@ export default function CommissionsSettings() {
         </div>
       </div>
 
-      {/* 2. NUEVA SECCIÓN: Regla de Puntos Mínimos */}
-      {/* Aquí insertamos el componente que acabamos de crear */}
       <section>
         <div className="flex items-center gap-2 mb-4">
            <Trophy className="w-5 h-5 text-yellow-600" />
@@ -262,10 +267,8 @@ export default function CommissionsSettings() {
         <MinPointsEditor />
       </section>
 
-      {/* Línea divisoria elegante */}
       <hr className="border-gray-200" />
 
-      {/* 3. SECCIÓN EXISTENTE: Tabla de Niveles */}
       <section>
         <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-6 gap-4">
            <div>
@@ -292,7 +295,6 @@ export default function CommissionsSettings() {
         </div>
       </section>
 
-      {/* 4. MODALES (Se quedan igual) */}
       <CommissionModal 
         isOpen={isModalOpen} 
         onClose={() => {

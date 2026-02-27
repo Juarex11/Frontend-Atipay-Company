@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +11,13 @@ import {
   type PaymentMethod
 } from '../../services/paymentMethodService';
 import UserPaymentMethods from '@/components/admin/UserPaymentMethods';
+
+const METHOD_THEMES: Record<string, { main: string; light: string; border: string }> = {
+  yape: { main: '#742284', light: 'rgba(116, 34, 132, 0.08)', border: '#742284' },
+  plin: { main: '#00bfa5', light: 'rgba(0, 191, 165, 0.08)', border: '#00bfa5' },
+  'transferencia bancaria': { main: '#004b98', light: 'rgba(0, 75, 152, 0.08)', border: '#004b98' },
+  'bonificación': { main: '#f59e0b', light: 'rgba(245, 158, 11, 0.08)', border: '#f59e0b' },
+};
 
 export default function AdminPaymentMethods() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -257,7 +265,13 @@ export default function AdminPaymentMethods() {
               <h2 className="text-xl font-semibold">Agregar Información de Método de Pago</h2>
             </div>
 
-            <div className="bg-white shadow rounded-lg p-6">
+            <div
+              className="transition-all duration-500 ease-in-out rounded-lg p-6"
+              style={{
+                backgroundColor: selectedMethodId ? METHOD_THEMES[paymentMethods.find(m => m.id === selectedMethodId)?.name.toLowerCase() || '']?.light || 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                borderLeft: selectedMethodId ? `6px solid ${METHOD_THEMES[paymentMethods.find(m => m.id === selectedMethodId)?.name.toLowerCase() || '']?.main || '#ccc'}` : '6px solid #ccc'
+              }}
+            >
               <form onSubmit={handleUserPaymentSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -279,7 +293,7 @@ export default function AdminPaymentMethods() {
 
                 {selectedMethodId && (
                   <div className="space-y-4 border-t pt-4 mt-4">
-                    <h3 className="font-medium text-gray-900">
+                    <h3 className="font-medium" style={{ color: METHOD_THEMES[paymentMethods.find(m => m.id === selectedMethodId)?.name.toLowerCase() || '']?.main || '#000' }}>
                       {paymentMethods.find(m => m.id === selectedMethodId)?.name} - Información Requerida
                     </h3>
                     {paymentMethods

@@ -8,12 +8,12 @@ import { API_BASE_URL } from '@/config';
 const fixImageUrl = (url: string | null | undefined) => {
   if (!url) return undefined; // Retornamos undefined para que React sepa manejarlo
   
-  // 1. Evitar URL doble (Ej: http://localhost.../http://localhost...)
-  const lastHttpIndex = url.lastIndexOf("http");
-  if (lastHttpIndex > 0) return url.substring(lastHttpIndex);
+  // 1. Evitar URL doble (Ej: https://localhost.../https://localhost...)
+  const lasthttpsIndex = url.lastIndexOf("https");
+  if (lasthttpsIndex > 0) return url.substring(lasthttpsIndex);
   
   // 2. Si ya es correcta
-  if (url.startsWith("http")) return url;
+  if (url.startsWith("https")) return url;
   
   // 3. Si es relativa, limpiamos y pegamos el dominio
   // Quitamos '/api' si existe en la base url para tener solo el dominio

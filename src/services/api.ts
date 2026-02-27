@@ -15,10 +15,10 @@ interface RegisterData {
 }
 
 export const loginUser = async (usernameOrEmail: string, password: string): Promise<AuthResponse> => {
-  console.log('Iniciando solicitud de login a: http://127.0.0.1:8000/api/login');
+  console.log('Iniciando solicitud de login a: https://back.mibolsillo.site/api/login');
 
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/login', {
+    const response = await fetch('https://back.mibolsillo.site/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -33,9 +33,10 @@ export const loginUser = async (usernameOrEmail: string, password: string): Prom
     const responseData = await response.json();
 
     if (!response.ok) {
-      throw new Error(responseData.message || 'Error en la autenticación');
-    }
-
+  // Ahora intentará leer 'error' (que es lo que envía tu Laravel) o 'message'
+  const errorMessage = responseData.error || responseData.message || 'Error desconocido en el servidor';
+  throw new Error(errorMessage);
+}
     console.log('Datos de la respuesta:', responseData);
     return responseData as AuthResponse;
   } catch (error) {

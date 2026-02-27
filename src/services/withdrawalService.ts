@@ -132,7 +132,7 @@ export const withdrawalService = {
   // Get current user's withdrawals
   async getMyWithdrawals(): Promise<Withdrawal[]> {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/withdrawals/my', {
+      const response = await fetch('https://back.mibolsillo.site/api/withdrawals/my', {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

@@ -129,7 +129,7 @@ export function ProductDialog({
                     fallback.className = 'w-full h-full flex flex-col items-center justify-center p-6 text-center';
                     fallback.innerHTML = `
                       <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gray-200 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400">
+                        <svg xmlns="https://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400">
                           <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
                           <circle cx="9" cy="9" r="2"></circle>
                           <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
@@ -210,7 +210,7 @@ export function ProductDialog({
                     {product.pointsEarned && product.pointsEarned > 0 && (
                       <div className="mt-2 flex items-center text-sm text-green-600">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-green-50 border border-green-100">
-                          <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                          <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20" xmlns="https://www.w3.org/2000/svg">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
                           Por esta compra ganas {product.pointsEarned} puntos.

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export function CreateUserModal({ onUserCreated, open: propOpen, onOpenChange, c
 
       console.log('Enviando solicitud a la API con:', JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch('http://127.0.0.1:8000/api/register', {
+      const response = await fetch('https://back.mibolsillo.site/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

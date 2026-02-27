@@ -317,18 +317,21 @@ export function WithdrawalsAdmin() {
       const data = await withdrawalService.getAllWithdrawals() as Array<Partial<Withdrawal> & Record<string, unknown>>;
 
       const formattedWithdrawals = data.map((item) => ({
-        ...item,
-        id: item.id || '',
-        user: item.user || 'unknown',
-        amount: Number(item.amount) || 0,
-        method: item.method || 'other',
-        status: (item.status || 'pending').toLowerCase() as WithdrawalStatus,
-        reference_code: item.reference_code || '',
-        created_at: item.created_at || new Date().toISOString(),
-        updated_at: item.updated_at || new Date().toISOString(),
-        requestDate: item.requestDate || new Date().toISOString(),
-        priority: item.priority || 'normal'
-      } as Withdrawal));
+    ...item,
+    id: item.id || '',
+    user: item.user || 'unknown',
+    amount: Number(item.amount) || 0,
+    method: item.method || 'other',
+    status: (item.status || 'pending').toLowerCase() as WithdrawalStatus,
+    reference_code: item.reference_code || '',
+    //Buscamos 'created_at' O 'request_date' (por si Laravel lo manda así)
+    //Quitamos el "|| new Date()" para que no mienta con la fecha
+    created_at: item.created_at || item.request_date || item.date || undefined,
+    updated_at: item.updated_at || undefined,
+    requestDate: item.requestDate || item.request_date || undefined,
+    
+    priority: item.priority || 'normal'
+} as Withdrawal));
 
       setWithdrawals(formattedWithdrawals);
     } catch (error) {

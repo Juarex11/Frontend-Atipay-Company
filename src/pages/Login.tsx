@@ -242,7 +242,7 @@ export default function Login() {
                   <div className="flex flex-col items-center">
                     <ReCAPTCHA
                       ref={captcha}
-                      sitekey="6LceRRksAAAAACFuzi3HbNTyIJ8mmJAChFV6FRJG"
+                      sitekey="6LegV2gsAAAAAJA4xTTPiPedyOi3Rkxl_S03S816"
                       onChange={onChange}
                     />
                     {captchaError && (

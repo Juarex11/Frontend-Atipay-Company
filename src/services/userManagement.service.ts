@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { API_BASE_URL } from "@/config";
 import { getAuthHeaders } from "@/lib/auth";
 
@@ -16,7 +17,9 @@ export interface UserListItem {
   lastName?: string;
   email: string;
   role: string;
-  status: 'active' | 'suspended' | 'pending';
+  status: 'active' | 'inactive' | 'suspended' | 'pending';
+  monthly_points: number;     // Nuevo campo para calificacion
+  accumulated_points: number; // Nuevo campo para regalos
   lastLogin?: string;
   last_login_at?: string;
   createdAt: string;
@@ -67,6 +70,7 @@ class UserManagementService {
     try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorMessage;
+    // eslint-disable-next-line no-empty
     } catch {
     }
     throw new Error(`Failed to fetch users: ${errorMessage}`);

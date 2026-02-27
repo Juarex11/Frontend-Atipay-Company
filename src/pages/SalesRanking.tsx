@@ -37,7 +37,7 @@ const SalesRanking: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://back.mibolsillo.site/api';
       const endpoint =
         activeTab === 'general'
           ? `${baseUrl}/affiliate/ranking`
