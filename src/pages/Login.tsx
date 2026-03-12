@@ -202,7 +202,7 @@ export default function Login() {
                 <div className="flex flex-col items-center gap-1">
                   <ReCAPTCHA
                     ref={captcha}
-                    sitekey="6Lf3GHAsAAAAAJ0oxgPwovNbqTTqLneSbeHhDDUJ"
+                    sitekey="6LegV2gsAAAAAJA4xTTPiPedyOi3Rkxl_S03S816"
                     
                     onChange={onCaptchaChange}
                     onExpired={onCaptchaExpired}
