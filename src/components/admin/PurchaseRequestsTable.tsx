@@ -43,11 +43,11 @@ const fixUrl = (url: string | null | undefined) => {
 
   // Si ya viene con https/https, revisamos si es localhost
   if (url.startsWith("https")) {
-    return url.replace("https://localhost", "https://back.mibolsillo.site");
+    return url.replace("https://localhost", "https://api.atipaycompany.com");
   }
 
   // Si viene solo la ruta relativa (/storage/...), le pegamos tu dominio
-  return `https://back.mibolsillo.site/storage/${url.replace(/^\/storage\//, "")}`;
+  return `https://api.atipaycompany.com/storage/${url.replace(/^\/storage\//, "")}`;
 };
 
 // Formatea fecha de forma segura (evita Invalid Date)

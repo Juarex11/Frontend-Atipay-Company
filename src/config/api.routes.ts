@@ -1,5 +1,5 @@
 // Base API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://back.mibolsillo.site/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.atipaycompany.com/api';
 
 // API Endpoints
 export const API_ROUTES = {

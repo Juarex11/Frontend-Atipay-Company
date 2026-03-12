@@ -342,7 +342,7 @@ export const CatalogPanel = ({
     if (!path) return null;
     if (typeof path === "string" && path.startsWith("https")) return path;
     path = path.replace("public/", "");
-    return `https://back.mibolsillo.site/storage/${path}`;
+    return `https://api.atipaycompany.com/storage/${path}`;
   };
 
   return (

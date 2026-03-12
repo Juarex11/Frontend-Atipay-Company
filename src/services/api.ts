@@ -15,10 +15,10 @@ interface RegisterData {
 }
 
 export const loginUser = async (usernameOrEmail: string, password: string): Promise<AuthResponse> => {
-  console.log('Iniciando solicitud de login a: https://back.mibolsillo.site/api/login');
+  console.log('Iniciando solicitud de login a: https://api.atipaycompany.com/api/login');
 
   try {
-    const response = await fetch('https://back.mibolsillo.site/api/login', {
+    const response = await fetch('https://api.atipaycompany.com/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

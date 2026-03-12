@@ -101,13 +101,13 @@ const PurchaseHistory: React.FC = () => {
     status?: string;
   } | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "https://back.mibolsillo.site";
+  const API_BASE = import.meta.env.VITE_API_BASE || "https://api.atipaycompany.com";
 
-  // Construye URL absoluta y corrige localhost -> back.mibolsillo.site
+  // Construye URL absoluta y corrige localhost -> api.atipaycompany.com
   function makeFullUrl(path?: string | null) {
     if (!path) return null;
     if (path.includes("localhost")) {
-      return path.replace("localhost", "back.mibolsillo.site");
+      return path.replace("localhost", "api.atipaycompany.com");
     }
     if (path.startsWith("https")) return path;
     const clean = path.startsWith("/") ? path : `/${path}`;

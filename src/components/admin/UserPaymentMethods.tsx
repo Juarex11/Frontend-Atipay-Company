@@ -152,7 +152,7 @@ export default function UserPaymentMethods() {
     try {
       setIsLoading(true);
       // CORRECCIÓN QUIRÚRGICA: https:// en lugar de httpss://
-      const response = await fetch('https://back.mibolsillo.site/api/user/payment-methods', {
+      const response = await fetch('https://api.atipaycompany.com/api/user/payment-methods', {
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders()

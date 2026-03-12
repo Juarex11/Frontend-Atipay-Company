@@ -201,7 +201,7 @@ export function NotificationsDropdown() {
 
   const fetchRecharges = async (headers: HeadersInit): Promise<Recharge[]> => {
     try {
-      const rechargesRes = await fetch('https://back.mibolsillo.site/api/atipay-recharges', { headers });
+      const rechargesRes = await fetch('https://api.atipaycompany.com/api/atipay-recharges', { headers });
       if (rechargesRes.ok) {
         const rechargesData = await rechargesRes.json();
         return Array.isArray(rechargesData) ? rechargesData : rechargesData?.data || [];
@@ -215,7 +215,7 @@ export function NotificationsDropdown() {
 
   const fetchUsers = async (headers: HeadersInit): Promise<User[]> => {
     try {
-      const usersRes = await fetch('https://back.mibolsillo.site/api/users', { headers });
+      const usersRes = await fetch('https://api.atipaycompany.com/api/users', { headers });
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         return Array.isArray(usersData) ? usersData : usersData?.data || [];
@@ -239,7 +239,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const response = await fetch('https://back.mibolsillo.site/api/withdrawals', {
+      const response = await fetch('https://api.atipaycompany.com/api/withdrawals', {
         headers,
         method: 'GET'
       });
@@ -266,7 +266,7 @@ export function NotificationsDropdown() {
 
   const fetchPurchaseRequests = async (headers: HeadersInit): Promise<PurchaseRequest[]> => {
     try {
-      const response = await fetch('https://back.mibolsillo.site/api/products/purchase-requests', {
+      const response = await fetch('https://api.atipaycompany.com/api/products/purchase-requests', {
         headers,
         method: 'GET'
       });
@@ -292,7 +292,7 @@ export function NotificationsDropdown() {
   // FIX: Fetch notifications stored in the backend DB (available to all users)
   const fetchDBNotifications = async (headers: HeadersInit): Promise<Notification[]> => {
     try {
-      const res = await fetch('https://back.mibolsillo.site/api/notifications', {
+      const res = await fetch('https://api.atipaycompany.com/api/notifications', {
         headers,
         method: 'GET'
       });
@@ -353,7 +353,7 @@ export function NotificationsDropdown() {
     }
 
     try {
-      const investmentsRes = await fetch('https://back.mibolsillo.site/api/investments/pending', {
+      const investmentsRes = await fetch('https://api.atipaycompany.com/api/investments/pending', {
         headers,
         method: 'GET'
       });

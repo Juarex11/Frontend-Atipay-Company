@@ -34,7 +34,7 @@ export interface DepositRequest {
   };
 }
 
-const API_BASE = 'https://back.mibolsillo.site/api';
+const API_BASE = 'https://api.atipaycompany.com/api';
 
 const getAuthHeaders = () => {
   const token = getAuthToken();

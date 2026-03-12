@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://back.mibolsillo.site';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.atipaycompany.com';
 
 // Table components
 const Table = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (

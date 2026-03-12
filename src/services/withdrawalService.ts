@@ -132,7 +132,7 @@ export const withdrawalService = {
   // Get current user's withdrawals
   async getMyWithdrawals(): Promise<Withdrawal[]> {
     try {
-      const response = await fetch('https://back.mibolsillo.site/api/withdrawals/my', {
+      const response = await fetch('https://api.atipaycompany.com/api/withdrawals/my', {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

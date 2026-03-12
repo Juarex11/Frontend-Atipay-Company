@@ -24,10 +24,10 @@ interface UploadProofProps {
 const fixUrl = (url: string | null | undefined) => {
   if (!url) return undefined;
   if (url.includes('https://localhost/storage')) {
-    return url.replace('https://localhost/', 'https://back.mibolsillo.site/');
+    return url.replace('https://localhost/', 'https://api.atipaycompany.com/');
   }
   if (url.startsWith('/storage')) {
-    return `https://back.mibolsillo.site${url}`;
+    return `https://api.atipaycompany.com${url}`;
   }
   return url;
 };

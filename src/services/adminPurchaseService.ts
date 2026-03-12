@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const API_URL = 'https://back.mibolsillo.site/api'; 
+const API_URL = 'https://api.atipaycompany.com/api'; 
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');

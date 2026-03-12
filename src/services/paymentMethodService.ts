@@ -1,4 +1,4 @@
-const API_URL = 'https://back.mibolsillo.site/api';
+const API_URL = 'https://api.atipaycompany.com/api';
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {

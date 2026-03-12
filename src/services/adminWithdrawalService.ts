@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://back.mibolsillo.site/api';
+const API_BASE_URL = 'https://api.atipaycompany.com/api';
 
 export interface AdminWithdrawal {
   id: string;

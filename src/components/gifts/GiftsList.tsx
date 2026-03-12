@@ -15,6 +15,7 @@ interface Gift {
   description: string;
   redeem_points: number;
   stock: number;
+  max_redeem: number; // ✅ agregado al tipo
   image_url: string;
   created_at?: string;
   updated_at?: string;
@@ -77,41 +78,39 @@ const GiftsList: React.FC = () => {
     
     try {
       if (editingGift?.id) {
-        console.log('Actualizando regalo existente...');
         const updatedGift = await giftService.updateGift(editingGift.id, formData);
-        console.log('Regalo actualizado recibido:', updatedGift);
-        
-        // Crear un objeto con la URL de la imagen forzando recarga
-        const updatedGiftWithImage = {
-          ...updatedGift,
-          // Forzar recarga de la imagen con timestamp
-          image_url: updatedGift.image_url 
-            ? `${updatedGift.image_url.split('?')[0]}?t=${new Date().getTime()}` 
-            : ''
-        };
-        
-        console.log('Actualizando imagen con URL:', updatedGiftWithImage.image_url);
-        
-        setGifts(prevGifts => {
-          const updatedGifts = prevGifts.map(gift =>
+
+        // El backend puede devolver { data: gift } o el gift directo
+        const giftData = updatedGift?.data ?? updatedGift;
+
+        // Usar los valores del formData como fuente de verdad
+        const nameFromForm      = formData.get('name') as string;
+        const descFromForm      = formData.get('description') as string;
+        const pointsFromForm    = formData.get('redeem_points') as string;
+        const stockFromForm     = formData.get('stock') as string;
+        const maxRedeemFromForm = formData.get('max_redeem') as string;
+
+        const imageUrl = giftData?.image_url
+          ? `${giftData.image_url.split('?')[0]}?t=${new Date().getTime()}`
+          : (formData.get('delete_image') === 'true' ? '' : editingGift.image_url ?? '');
+
+        setGifts(prevGifts =>
+          prevGifts.map(gift =>
             gift.id === editingGift.id
-              ? { 
-                  ...gift, 
-                  ...updatedGiftWithImage,
-                  name: updatedGiftWithImage.name || gift.name,
-                  description: updatedGiftWithImage.description || gift.description,
-                  redeem_points: updatedGiftWithImage.redeem_points ?? gift.redeem_points,
-                  stock: updatedGiftWithImage.stock ?? gift.stock,
-                  // Usar la URL con timestamp para forzar recarga
-                  image_url: updatedGiftWithImage.image_url,
-                  updated_at: updatedGiftWithImage.updated_at || new Date().toISOString()
+              ? {
+                  ...gift,
+                  name:          nameFromForm      || giftData?.name          || gift.name,
+                  description:   descFromForm      ?? giftData?.description   ?? gift.description,
+                  redeem_points: pointsFromForm    ? Number(pointsFromForm)   : (giftData?.redeem_points ?? gift.redeem_points),
+                  stock:         stockFromForm     ? Number(stockFromForm)    : (giftData?.stock         ?? gift.stock),
+                  max_redeem:    maxRedeemFromForm ? Number(maxRedeemFromForm): (giftData?.max_redeem    ?? gift.max_redeem),
+                  image_url:     imageUrl,
+                  updated_at:    giftData?.updated_at || new Date().toISOString(),
                 }
               : gift
-          );
-          console.log('Lista de regalos actualizada:', updatedGifts);
-          return updatedGifts;
-        });
-        
+          )
+        );
+
         toast.success('Regalo actualizado correctamente');
       } else {
         console.log('Creando nuevo regalo...');
@@ -126,14 +125,13 @@ const GiftsList: React.FC = () => {
             description: newGift.description || '',
             redeem_points: newGift.redeem_points || 0,
             stock: newGift.stock || 0,
+            max_redeem: newGift.max_redeem || 1, // ✅ incluir max_redeem
             image_url: newGift.image_url || '',
             created_at: newGift.created_at || new Date().toISOString(),
             updated_at: newGift.updated_at || new Date().toISOString()
           };
           
-          const updatedGifts = [...prevGifts, newGiftWithDefaults];
-          console.log('Lista de regalos actualizada:', updatedGifts);
-          return updatedGifts;
+          return [...prevGifts, newGiftWithDefaults];
         });
         
         toast.success('Regalo creado correctamente');
@@ -148,6 +146,7 @@ const GiftsList: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -196,6 +195,7 @@ const GiftsList: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Puntos</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Límite canjes</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
@@ -222,9 +222,7 @@ const GiftsList: React.FC = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {gift.name}
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">{gift.name}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-500 truncate max-w-xs">{gift.description}</div>
@@ -237,6 +235,10 @@ const GiftsList: React.FC = () => {
                           {gift.stock > 0 ? `Disponible (${gift.stock})` : 'Agotado'}
                         </span>
                       </td>
+                      {/* ✅ nueva columna visible */}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{gift.max_redeem ?? 1}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={(e) => {
@@ -247,6 +249,7 @@ const GiftsList: React.FC = () => {
                               description: gift.description,
                               redeem_points: gift.redeem_points,
                               stock: gift.stock,
+                              max_redeem: gift.max_redeem ?? 1, // ✅ FIX: se pasa max_redeem
                               image_url: gift.image_url
                             });
                             setIsFormOpen(true);
@@ -278,7 +281,6 @@ const GiftsList: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Gift Form Modal */}
       <GiftFormModal
         isOpen={isFormOpen}
         onClose={() => {
@@ -298,7 +300,6 @@ const GiftsList: React.FC = () => {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
         isOpen={!!giftToDelete}
         onClose={() => setGiftToDelete(null)}

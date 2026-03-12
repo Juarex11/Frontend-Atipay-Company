@@ -39,19 +39,28 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageRemoved, setImageRemoved] = useState<boolean>(false);
 
+  // ✅ FIX: un solo useEffect que resetea TODO al abrir el modal
   useEffect(() => {
+    if (!isOpen) return;
+
+    // Siempre limpiar el archivo seleccionado y preview al abrir
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setImageRemoved(false);
+
     if (initialData) {
       setFormData({
         name: initialData.name || '',
         description: initialData.description || '',
         redeem_points: initialData.redeem_points || 0,
         stock: initialData.stock || 0,
-        max_redeem: initialData.max_redeem || 1,
+        max_redeem: initialData.max_redeem ?? 1, // ✅ FIX: usa ?? para respetar el valor 0 si existiera
         image_url: initialData.image_url || '',
       });
-      setImageRemoved(false); // Reset image removed state
+      setPointsValue(initialData.redeem_points?.toString() || '');
+      setStockValue(initialData.stock?.toString() || '');
+      setMaxRedeemValue(initialData.max_redeem?.toString() ?? '1'); // ✅ FIX
     } else {
-      // Reset form when opening for new gift
       setFormData({
         name: '',
         description: '',
@@ -60,7 +69,9 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
         max_redeem: 1,
         image_url: '',
       });
-      setImageRemoved(false);
+      setPointsValue('');
+      setStockValue('');
+      setMaxRedeemValue('');
     }
   }, [initialData, isOpen]);
 
@@ -68,28 +79,12 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
   const [stockValue, setStockValue] = useState<string>('');
   const [maxRedeemValue, setMaxRedeemValue] = useState<string>('');
 
-  useEffect(() => {
-    if (initialData) {
-      setPointsValue(initialData.redeem_points?.toString() || '');
-      setStockValue(initialData.stock?.toString() || '');
-      setMaxRedeemValue(initialData.max_redeem?.toString() || '');
-    } else {
-      setPointsValue('');
-      setStockValue('');
-      setMaxRedeemValue('');
-    }
-  }, [initialData, isOpen]);
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
     if (name === 'redeem_points') {
       setPointsValue(value);
-      // Actualizar formData con el valor numérico o 0 si está vacío
-      setFormData(prev => ({
-        ...prev,
-        [name]: value === '' ? 0 : Number(value)
-      }));
+      setFormData(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
     } else if (name === 'stock') {
       setStockValue(value);
       setFormData(prev => ({ ...prev, [name]: value === '' ? 0 : Number(value) }));
@@ -101,12 +96,12 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
     }
   };
 
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
+      setImageRemoved(false); // ✅ FIX: si selecciona una nueva, no está "removed"
     }
   };
 
@@ -115,37 +110,36 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
 
     const formDataToSend = new FormData();
     
-    // Asegurarse de que los valores numéricos sean correctos al enviar
     const redeemPointsValue = pointsValue === '' ? 0 : Number(pointsValue);
     const stockValueToSend = stockValue === '' ? 0 : Number(stockValue);
+    const maxRedeemToSend = maxRedeemValue === '' ? 1 : Number(maxRedeemValue);
 
-    // Solo incluir los campos que han cambiado
+    // Nombre — si no cambió, omitir validación única
     if (formData.name !== initialData?.name) {
       formDataToSend.append('name', formData.name);
     } else {
-      // Si el nombre no ha cambiado, indicar que se debe omitir la validación
+      formDataToSend.append('name', formData.name); // ✅ FIX: siempre enviar el nombre
       formDataToSend.append('skip_name_validation', 'true');
     }
 
     formDataToSend.append('description', formData.description);
     formDataToSend.append('redeem_points', redeemPointsValue.toString());
     formDataToSend.append('stock', stockValueToSend.toString());
-    formDataToSend.append('max_redeem', maxRedeemValue === '' ? '1' : maxRedeemValue);
+    formDataToSend.append('max_redeem', maxRedeemToSend.toString()); // ✅ FIX: usa variable calculada
 
-    // Manejar la imagen
+    // Manejo de imagen
     if (selectedFile) {
-      // Si hay un nuevo archivo seleccionado, enviarlo
+      // Nueva imagen seleccionada
       formDataToSend.append('reward_image', selectedFile);
-    } else if (initialData?.image_url && !imageRemoved) {
-      // Si hay una imagen existente y no se ha eliminado, mantenerla
-      formDataToSend.append('image_url', initialData.image_url);
     } else if (imageRemoved) {
-      // Si se ha eliminado la imagen explícitamente, enviar un valor especial
-      // para indicar al servidor que elimine la imagen
+      // Se eliminó la imagen existente explícitamente
       formDataToSend.append('delete_image', 'true');
+    } else if (initialData?.image_url) {
+      // Mantener imagen existente
+      formDataToSend.append('image_url', initialData.image_url);
     }
 
-    // Si es una edición, agregar el método PUT
+    // Si es edición
     if (initialData?.id) {
       formDataToSend.append('_method', 'PUT');
       formDataToSend.append('_id', initialData.id.toString());
@@ -156,6 +150,8 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Determina qué imagen mostrar en el preview
+  const displayImage = previewUrl || (!imageRemoved && initialData?.image_url) || null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -240,6 +236,7 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
                 disabled={isSubmitting}
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Límite de canjes *
@@ -264,10 +261,10 @@ export const GiftFormModal: React.FC<GiftFormModalProps> = ({
             </label>
             <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
               <div className="space-y-1 text-center">
-                {(previewUrl || (initialData?.image_url && !imageRemoved)) ? (
+                {displayImage ? (
                   <div className="relative">
                     <img
-                      src={previewUrl || initialData?.image_url}
+                      src={displayImage}
                       alt="Vista previa"
                       className="mx-auto h-32 w-32 object-cover rounded-md"
                     />

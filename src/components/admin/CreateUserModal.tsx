@@ -66,7 +66,7 @@ export function CreateUserModal({ onUserCreated, open: propOpen, onOpenChange, c
 
       console.log('Enviando solicitud a la API con:', JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch('https://back.mibolsillo.site/api/register', {
+      const response = await fetch('https://api.atipaycompany.com/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

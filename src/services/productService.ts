@@ -1,5 +1,5 @@
 import { API_ROUTES } from '@/config/api.routes';
-import { getAuthHeaders } from '@/lib/auth';
+import { getAuthHeaders, redirectToLogin } from '@/lib/auth';
 
 export interface Product {
   id: string;
@@ -79,7 +79,7 @@ export const productService = {
         // Si el error es 401 (No autorizado), redirigir al login
         if (response.status === 401) {
           // Importar la función de redirección
-          const { redirectToLogin } = await import('@/lib/auth');
+           
           redirectToLogin();
           throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
         }
@@ -126,7 +126,7 @@ export const productService = {
   async validateAuth(): Promise<string> {
     const token = localStorage.getItem('token');
     if (!token) {
-      const { redirectToLogin } = await import('@/lib/auth');
+       
       redirectToLogin();
       throw new Error('No estás autenticado. Por favor, inicia sesión.');
     }
@@ -145,7 +145,7 @@ export const productService = {
   // Helper function to handle API errors
   async handleApiError(response: Response): Promise<never> {
     if (response.status === 401) {
-      const { redirectToLogin } = await import('@/lib/auth');
+       
       redirectToLogin();
       throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
     }

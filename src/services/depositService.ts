@@ -1,7 +1,7 @@
 import { getAuthToken } from '../utils/auth';
 
 // Asegúrate de que esta URL sea la correcta para tu backend
-const API_BASE = 'https://back.mibolsillo.site/api'; 
+const API_BASE = 'https://api.atipaycompany.com/api'; 
 
 export interface DepositRequest {
   id: number;

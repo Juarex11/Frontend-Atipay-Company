@@ -50,7 +50,7 @@ const UserGiftCatalog = () => {
     // 2. Función para obtener los puntos reales del usuario desde el backend
     const fetchUserPoints = async () => {
       try {
-        const response = await fetch('https://back.mibolsillo.site/api/user', {
+        const response = await fetch('https://api.atipaycompany.com/api/user', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Accept': 'application/json',
@@ -82,7 +82,7 @@ const UserGiftCatalog = () => {
 
   const fetchRewardRequests = async () => {
     try {
-      const response = await fetch('https://back.mibolsillo.site/api/rewards/my-requests', {
+      const response = await fetch('https://api.atipaycompany.com/api/rewards/my-requests', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Accept': 'application/json',
@@ -121,7 +121,7 @@ const UserGiftCatalog = () => {
     setIsRedeeming(true);
 
     try {
-      const response = await fetch(`https://back.mibolsillo.site/api/rewards/${gift.id}/request`, {
+      const response = await fetch(`https://api.atipaycompany.com/api/rewards/${gift.id}/request`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -157,7 +157,7 @@ const UserGiftCatalog = () => {
     setClaimingRequestId(requestId);
 
     try {
-      const response = await fetch(`https://back.mibolsillo.site/api/reward-requests/${requestId}/claim`, {
+      const response = await fetch(`https://api.atipaycompany.com/api/reward-requests/${requestId}/claim`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

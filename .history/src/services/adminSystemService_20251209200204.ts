@@ -3,7 +3,7 @@
 import { getAuthToken } from '../utils/auth'; // Asegúrate de que esta ruta sea correcta
 
 // Ajusta la URL base si usas variables de entorno, ej: import.meta.env.VITE_API_URL
-const API_BASE = 'https://back.mibolsillo.site/api'; 
+const API_BASE = 'https://api.atipaycompany.com/api'; 
 
 const getAuthHeaders = () => {
     const token = getAuthToken();

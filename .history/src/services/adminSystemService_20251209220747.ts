@@ -3,7 +3,7 @@
 import { getAuthToken } from '../utils/auth'; 
 
 // Ajusta la URL base si usas variables de entorno
-const API_BASE = 'https://back.mibolsillo.site/api'; 
+const API_BASE = 'https://api.atipaycompany.com/api'; 
 
 const getAuthHeaders = () => {
     const token = getAuthToken();

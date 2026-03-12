@@ -37,7 +37,7 @@ const SalesRanking: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const baseUrl = import.meta.env.VITE_API_URL || 'https://back.mibolsillo.site/api';
+      const baseUrl = import.meta.env.VITE_API_URL || 'https://api.atipaycompany.com/api';
       const endpoint =
         activeTab === 'general'
           ? `${baseUrl}/affiliate/ranking`
