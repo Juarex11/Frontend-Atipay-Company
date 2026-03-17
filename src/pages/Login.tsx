@@ -202,7 +202,7 @@ export default function Login() {
                 <div className="flex flex-col items-center gap-1">
                   <ReCAPTCHA
                     ref={captcha}
-                    sitekey="6LegV2gsAAAAAJA4xTTPiPedyOi3Rkxl_S03S816"
+                    sitekey="6Lf3GHAsAAAAAJ0oxgPwovNbqTTqLneSbeHhDDUJ"
                     
                     onChange={onCaptchaChange}
                     onExpired={onCaptchaExpired}
@@ -215,17 +215,22 @@ export default function Login() {
                   )}
                 </div>
 
-              <div className="flex justify-end">
-  <a
-    href="https://wa.me/51906289965?text=Hola,%20vengo%20de%20la%20web%20y%20deseo%20unirme%20a%20invertir."
+<div className="flex items-center justify-between">
+  <Link
+    to="/forgot-password"
+    className="text-sm text-green-600 hover:text-green-700 font-medium"
+  >
+    {"¿Olvidé mi contraseña?"}
+  </Link>
+  
+   <a href="https://wa.me/51906289965?text=Hola,%20vengo%20de%20la%20web%20y%20deseo%20unirme%20a%20invertir."
     target="_blank"
     rel="noopener noreferrer"
     className="text-sm text-green-600 hover:text-green-700 font-medium"
   >
-    Deseo Informaciòn
+    {"Deseo informacion"}
   </a>
 </div>
-
                 <Button
                   type="submit"
                   className="w-full h-12 text-base font-semibold bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white cursor-pointer"

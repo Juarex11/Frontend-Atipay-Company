@@ -44,6 +44,8 @@ import NotFound from "./pages/NotFound";
 import { ManualPurchasePage } from "./pages/admin/ManualPurchasePage";
 import MyRewards from "./pages/usuario/MyRewards";
 import useAutoLogout from "./hooks/useAutoLogout";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -144,13 +146,25 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
-      <Route
+    <Route
         path="/register"
         element={
           <PublicRoute>
             <NewRegister />
           </PublicRoute>
         }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPassword />}
       />
       <Route
         path="/dashboard"
